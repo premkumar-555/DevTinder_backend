@@ -1,0 +1,29 @@
+{
+  "name": "devtinder_backend",
+  "version": "1.0.0",
+  "description": "backend server for DevTinder web client",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/premkumar-555/DevTinder_backend.git"
+  },
+  "keywords": [
+    "NodeJs",
+    "Javascript",
+    "ES6+",
+    "ExpressJs"
+  ],
+  "author": "Premkumar Hulikoppe",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/premkumar-555/DevTinder_backend/issues"
+  },
+  "homepage": "https://github.com/premkumar-555/DevTinder_backend#readme",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
