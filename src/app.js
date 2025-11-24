@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 const connectDB = require("./config/database");
 const User = require("./models/user");
+const { isObjectIdOrHexString } = require("mongoose");
 const port = 3000;
 
 // to transform json request to normal js object form
@@ -17,9 +18,57 @@ app.post("/signup", async (req, res) => {
     return res.status(200).send("User signup is successful!");
   } catch (err) {
     console.log(`Err @ user signup : ${JSON.stringify(err)}`);
-    return res
-      .status(500)
-      .send(err.message || "Something went wrong at user signup!");
+    return res.status(500).send(err.message || "Something went wrong!");
+  }
+});
+
+// GET user by emailId
+app.get("/user", async (req, res) => {
+  try {
+    const user = await User.findOne({ emailId: req.body.emailId });
+    if (!user) {
+      return res.status(404).send("User not found!");
+    } else {
+      return res.send(user);
+    }
+  } catch (err) {
+    console.log(`Err @ get user by emailId : ${JSON.stringify(err)}`);
+    return res.status(500).send(err.message || "Something went wrong!");
+  }
+});
+
+// GET feed API - get all users from db
+app.get("/feed", async (req, res) => {
+  try {
+    const users = await User.find({});
+    if (users.length === 0) {
+      return res.status(404).send("No users exist!");
+    } else {
+      return res.send(users);
+    }
+  } catch (err) {
+    console.log(`Err @ feed users : ${JSON.stringify(err)}`);
+    return res.status(500).send(err.message || "Something went wrong!");
+  }
+});
+
+// GET user by Id
+app.get("/userById/:id", async (req, res) => {
+  try {
+    // validate the Id
+    if (!isObjectIdOrHexString(req.params.id)) {
+      return res.status(400).send("Invalid userId!");
+    } else {
+      const user = await User.findById(req.params.id);
+      if (!user) {
+        return res.status(404).send("User not found!");
+      } else {
+        return res.send(user);
+      }
+    }
+  } catch (err) {
+    console.log(`Err @ get userById : ${JSON.stringify(err)}`);
+    return res.status(500).send(err.message || "Something went wrong!");
   }
 });
 
