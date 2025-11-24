@@ -4,16 +4,14 @@ const connectDB = require("./config/database");
 const User = require("./models/user");
 const port = 3000;
 
+// to transform json request to normal js object form
+app.use(express.json());
+
 // user signup api
 app.post("/signup", async (req, res) => {
   try {
-    const user = new User({
-      firstName: "Pooja",
-      lastName: "Patil",
-      age: 28,
-      gender: "Female",
-      emailId: "patilpooja@gmail.com",
-    });
+    // creating a new user instance using user model
+    const user = new User(req.body);
     await user.save();
     console.log(`User signup is successful!`);
     return res.status(200).send("User signup is successful!");
