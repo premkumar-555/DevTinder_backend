@@ -72,6 +72,23 @@ app.get("/userById/:id", async (req, res) => {
   }
 });
 
+// DELETE user by Id
+app.delete("/user", async (req, res) => {
+  try {
+    // validate the Id
+    if (!req.body.userId) {
+      return res.status(400).send("Please provide userId!");
+    } else if (!isObjectIdOrHexString(req.body.userId)) {
+      return res.status(400).send("Invalid userId!");
+    }
+    await User.findByIdAndDelete(req.body.userId);
+    return res.send("Deleted user successfully!");
+  } catch (err) {
+    console.log(`Err @ delete user by Id : ${JSON.stringify(err)}`);
+    return res.status(500).send(err.message || "Something went wrong!");
+  }
+});
+
 // first connect to db then start server application
 connectDB()
   .then(() => {
