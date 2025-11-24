@@ -80,11 +80,36 @@ app.delete("/user", async (req, res) => {
       return res.status(400).send("Please provide userId!");
     } else if (!isObjectIdOrHexString(req.body.userId)) {
       return res.status(400).send("Invalid userId!");
+    } else {
+      await User.findByIdAndDelete(req.body.userId);
+      return res.send("Deleted user successfully!");
     }
-    await User.findByIdAndDelete(req.body.userId);
-    return res.send("Deleted user successfully!");
   } catch (err) {
     console.log(`Err @ delete user by Id : ${JSON.stringify(err)}`);
+    return res.status(500).send(err.message || "Something went wrong!");
+  }
+});
+
+// UPDATE user by Id
+app.patch("/user", async (req, res) => {
+  try {
+    // validate the Id
+    if (!req.body.userId) {
+      return res.status(400).send("Please provide userId!");
+    } else if (!isObjectIdOrHexString(req.body.userId)) {
+      return res.status(400).send("Invalid userId!");
+    }
+    // update and return latest updated user data
+    const user = await User.findByIdAndUpdate(req.body.userId, req.body, {
+      returnDocument: "after",
+    });
+    if (!user) {
+      return res.status(404).send("User not found!");
+    } else {
+      return res.send({ msg: "Updated user successfully", data: user });
+    }
+  } catch (err) {
+    console.log(`Err @ update user by Id : ${JSON.stringify(err)}`);
     return res.status(500).send(err.message || "Something went wrong!");
   }
 });
