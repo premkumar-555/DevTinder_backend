@@ -91,16 +91,33 @@ app.delete("/user", async (req, res) => {
 });
 
 // UPDATE user by Id
-app.patch("/user", async (req, res) => {
+app.patch("/user/:userId", async (req, res) => {
   try {
     // validate the Id
-    if (!req.body.userId) {
-      return res.status(400).send("Please provide userId!");
-    } else if (!isObjectIdOrHexString(req.body.userId)) {
+    if (!isObjectIdOrHexString(req.params?.userId)) {
       return res.status(400).send("Invalid userId!");
     }
+    // validate allowed update keys eg : update should be denied for emailId
+    const ALLOWED_UPDATE_KEYS = [
+      "password",
+      "age",
+      "profileUrl",
+      "about",
+      "skills",
+    ];
+    // check for allowed update
+    const notAllowedKeys = Object.keys(req.body)?.filter(
+      (x) => !ALLOWED_UPDATE_KEYS.includes(x)
+    );
+    if (!!notAllowedKeys && !!notAllowedKeys?.length) {
+      return res
+        .status(400)
+        .send(
+          `Update is not allowed for keys ${JSON.stringify(notAllowedKeys)}!`
+        );
+    }
     // update and return latest updated user data
-    const user = await User.findByIdAndUpdate(req.body.userId, req.body, {
+    const user = await User.findByIdAndUpdate(req.params?.userId, req.body, {
       returnDocument: "after",
       runValidators: true,
     });

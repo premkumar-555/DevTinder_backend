@@ -28,12 +28,6 @@ const userSchema = new mongoose.Schema({
     trim: true,
     lowercase: true,
     maxLength: [25, "Maximum length of emailId should be 25!"],
-    // validate: {
-    //   validator: function (v) {
-    //     return regExpns.email.test(v);
-    //   },
-    //   message: (props) => `${props?.value} is not a valid emailId!`,
-    // },
     match: [regExpns.email, "{PATH} is invalid!"],
     cast: "'{PATH}' value is not a valid string!",
   },
@@ -43,12 +37,6 @@ const userSchema = new mongoose.Schema({
     trim: true,
     minLength: [8, "Minimum length of password should be 8!"],
     maxLength: [12, "Maximum length of password should be 12!"],
-    // validate: {
-    //   validator: function (v) {
-    //     return regExpns.password.test(v);
-    //   },
-    //   message: (props) => `${props?.value} is not a valid password!`,
-    // },
     match: [regExpns.password, "{PATH} is invalid!"],
     cast: "'{PATH}' value is not a valid string!",
   },
@@ -80,7 +68,7 @@ const userSchema = new mongoose.Schema({
   about: {
     type: String,
     trim: true,
-    maxLength: [50, "Maximum length of '{PATH}' should be 50!"],
+    maxLength: [100, "Maximum length of '{PATH}' should be 50!"],
     cast: "'{PATH}' value is not a valid string!",
   },
   skills: {
