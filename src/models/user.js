@@ -10,14 +10,16 @@ const userSchema = new mongoose.Schema({
     minLength: [4, "Minimum length of firstName should be 4!"],
     maxLength: [12, "Maximum length of firstName should be 12!"],
     // to customize type casting error message
-    cast: "{PATH} value is not a valid string!",
+    cast: "'{PATH}' value is not a valid string!",
+    match: [regExpns.text, "{PATH} is invalid!"],
   },
   lastName: {
     type: String,
     trim: true,
     minLength: [4, "Minimum length of lastName should be 4!"],
     maxLength: [12, "Maximum length of lastName should be 12!"],
-    cast: "{PATH} value is not a valid string!",
+    cast: "'{PATH}' value is not a valid string!",
+    match: [regExpns.text, "{PATH} is invalid!"],
   },
   emailId: {
     type: String,
@@ -32,8 +34,8 @@ const userSchema = new mongoose.Schema({
     //   },
     //   message: (props) => `${props?.value} is not a valid emailId!`,
     // },
-    match: [regExpns.email, "{VALUE} is not a valid emailId"],
-    cast: "{PATH} value is not a valid string!",
+    match: [regExpns.email, "{PATH} is invalid!"],
+    cast: "'{PATH}' value is not a valid string!",
   },
   password: {
     type: String,
@@ -47,8 +49,8 @@ const userSchema = new mongoose.Schema({
     //   },
     //   message: (props) => `${props?.value} is not a valid password!`,
     // },
-    match: [regExpns.password, "{VALUE} is not a valid password!"],
-    cast: "{PATH} value is not a valid string!",
+    match: [regExpns.password, "{PATH} is invalid!"],
+    cast: "'{PATH}' value is not a valid string!",
   },
   gender: {
     type: String,
@@ -59,12 +61,12 @@ const userSchema = new mongoose.Schema({
       values: ["male", "female", "others"],
       message: "{VALUE} is not a supported gender!",
     },
-    cast: "{PATH} value is not a valid string!",
+    cast: "'{PATH}' value is not a valid string!",
   },
   age: {
     type: Number,
     min: [18, "Minimum age of user should be 18!"],
-    cast: "{PATH} value is not a valid number!",
+    cast: "'{PATH}' value is not a valid number!",
   },
   profileUrl: {
     type: String,
@@ -72,7 +74,21 @@ const userSchema = new mongoose.Schema({
     default:
       "https://png.pngtree.com/png-vector/20190710/ourmid/pngtree-user-vector-avatar-png-image_1541962.jpg",
     maxLength: [100, "Maximum length of profileUrl should be 100!"],
-    cast: "{PATH} value is not a valid string!",
+    cast: "'{PATH}' value is not a valid string!",
+    match: [regExpns.url, "{PATH} is invalid!"],
+  },
+  about: {
+    type: String,
+    trim: true,
+    maxLength: [50, "Maximum length of '{PATH}' should be 50!"],
+    cast: "'{PATH}' value is not a valid string!",
+  },
+  skills: {
+    type: [String],
+    validate: {
+      validator: (v) => v?.length <= 5,
+      message: (props) => `${props?.path} shouldn't be more than 5!`,
+    },
   },
 });
 
