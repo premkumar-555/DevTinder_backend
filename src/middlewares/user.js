@@ -1,7 +1,7 @@
 const validator = require("validator");
 
 // validate user signup data
-const validateSignupData = async (req, res, next) => {
+const validateSignupData = (req, res, next) => {
   try {
     const { firstName, lastName, emailId, password } = req.body;
     if (!firstName || !lastName) {
@@ -27,10 +27,36 @@ const validateSignupData = async (req, res, next) => {
     }
     next();
   } catch (err) {
+    console.log(`Err @ validateSignupData : ${JSON.stringify(err)}`);
+    res.status(400).send(`ERROR : ${err?.message || "Something went wrong!"}`);
+  }
+};
+
+// validate user login data
+const validateLoginData = (req, res, next) => {
+  try {
+    // check emailId & password
+    const { emailId, password } = req.body;
+    if (!emailId) {
+      throw new Error("emailId is required!");
+    }
+    if (!password) {
+      throw new Error("password is required!");
+    }
+    if (!validator.isEmail(emailId)) {
+      throw new Error("Invalid emailId!");
+    }
+    if (!validator.isStrongPassword(password)) {
+      throw new Error("Please provide strong password!");
+    }
+    next();
+  } catch (err) {
+    console.log(`Err @ validateLoginData : ${JSON.stringify(err)}`);
     res.status(400).send(`ERROR : ${err?.message || "Something went wrong!"}`);
   }
 };
 
 module.exports = {
   validateSignupData,
+  validateLoginData,
 };

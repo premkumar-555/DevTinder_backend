@@ -4,7 +4,7 @@ const bcrypt = require("bcrypt");
 const connectDB = require("./config/database");
 const User = require("./models/user");
 const { isObjectIdOrHexString } = require("mongoose");
-const { validateSignupData } = require("./middlewares/user");
+const { validateSignupData, validateLoginData } = require("./middlewares/user");
 const port = 3000;
 
 // to transform json request to normal js object form
@@ -31,7 +31,35 @@ app.post("/signup", validateSignupData, async (req, res) => {
     return res.status(200).send("User signup is successful!");
   } catch (err) {
     console.log(`Err @ user signup : ${JSON.stringify(err)}`);
-    return res.status(500).send(err.message || "Something went wrong!");
+    return res
+      .status(500)
+      .send(`ERROR : ${err.message || "Something went wrong!"}`);
+  }
+});
+
+app.post("/login", validateLoginData, async (req, res) => {
+  try {
+    // extract emailId and password
+    const { emailId, password } = req.body;
+    // check user exists for provided emailId
+    const user = await User.findOne({ emailId }, { _id: 0, password: 1 });
+    if (!user) {
+      // don't explicitly inform about invalid fields
+      return res.status(400).send("ERROR : Invalid credentials!");
+    }
+    // check password
+    const isValidPassword = await bcrypt.compare(password, user?.password);
+    if (!isValidPassword) {
+      // don't explicitly inform about invalid fields
+      return res.status(400).send("ERROR : Invalid credentials!");
+    }
+    console.log(`User login is successful!`);
+    return res.status(200).send("User login is successful!");
+  } catch (err) {
+    console.log(`Err @ user signup : ${JSON.stringify(err)}`);
+    return res
+      .status(500)
+      .send(`ERROR : ${err.message || "Something went wrong!"}`);
   }
 });
 
@@ -46,7 +74,9 @@ app.get("/user", async (req, res) => {
     }
   } catch (err) {
     console.log(`Err @ get user by emailId : ${JSON.stringify(err)}`);
-    return res.status(500).send(err.message || "Something went wrong!");
+    return res
+      .status(500)
+      .send(`ERROR : ${err.message || "Something went wrong!"}`);
   }
 });
 
@@ -61,7 +91,9 @@ app.get("/feed", async (req, res) => {
     }
   } catch (err) {
     console.log(`Err @ feed users : ${JSON.stringify(err)}`);
-    return res.status(500).send(err.message || "Something went wrong!");
+    return res
+      .status(500)
+      .send(`ERROR : ${err.message || "Something went wrong!"}`);
   }
 });
 
@@ -70,7 +102,7 @@ app.get("/userById/:id", async (req, res) => {
   try {
     // validate the Id
     if (!isObjectIdOrHexString(req.params.id)) {
-      return res.status(400).send("Invalid userId!");
+      return res.status(400).send("ERROR : Invalid userId!");
     } else {
       const user = await User.findById(req.params.id);
       if (!user) {
@@ -81,7 +113,9 @@ app.get("/userById/:id", async (req, res) => {
     }
   } catch (err) {
     console.log(`Err @ get userById : ${JSON.stringify(err)}`);
-    return res.status(500).send(err.message || "Something went wrong!");
+    return res
+      .status(500)
+      .send(`ERROR : ${err.message || "Something went wrong!"}`);
   }
 });
 
@@ -92,14 +126,16 @@ app.delete("/user", async (req, res) => {
     if (!req.body.userId) {
       return res.status(400).send("Please provide userId!");
     } else if (!isObjectIdOrHexString(req.body.userId)) {
-      return res.status(400).send("Invalid userId!");
+      return res.status(400).send("ERROR : Invalid userId!");
     } else {
       await User.findByIdAndDelete(req.body.userId);
       return res.send("Deleted user successfully!");
     }
   } catch (err) {
     console.log(`Err @ delete user by Id : ${JSON.stringify(err)}`);
-    return res.status(500).send(err.message || "Something went wrong!");
+    return res
+      .status(500)
+      .send(`ERROR : ${err.message || "Something went wrong!"}`);
   }
 });
 
@@ -108,7 +144,7 @@ app.patch("/user/:userId", async (req, res) => {
   try {
     // validate the Id
     if (!isObjectIdOrHexString(req.params?.userId)) {
-      return res.status(400).send("Invalid userId!");
+      return res.status(400).send("ERROR : Invalid userId!");
     }
     // validate allowed update keys eg : update should be denied for emailId
     const ALLOWED_UPDATE_KEYS = [
@@ -141,7 +177,9 @@ app.patch("/user/:userId", async (req, res) => {
     }
   } catch (err) {
     console.log(`Err @ update user by Id : ${JSON.stringify(err)}`);
-    return res.status(500).send(err.message || "Something went wrong!");
+    return res
+      .status(500)
+      .send(`ERROR : ${err.message || "Something went wrong!"}`);
   }
 });
 
