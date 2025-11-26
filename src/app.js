@@ -22,17 +22,14 @@ app.post("/signup", validateSignupData, async (req, res) => {
   try {
     // extract req body payload
     const { firstName, lastName, emailId, password } = req.body;
-
-    // encrypt password before saving to db
-    const hashedPassword = await bcrypt.hash(password, 10);
-
     // creating a new user instance using user model
     const user = new User({
       firstName,
       lastName,
       emailId,
-      password: hashedPassword,
     });
+    // encrypt password before saving to db
+    user.password = await user.getHashedPassword(password);
     await user.save();
     console.log(`User signup is successful!`);
     return res.status(200).send("User signup is successful!");
@@ -54,26 +51,24 @@ app.post("/login", validateLoginData, async (req, res) => {
       // don't explicitly inform about invalid fields
       return res.status(400).send("ERROR : Invalid credentials!");
     }
-    // check password
-    const isValidPassword = await bcrypt.compare(password, user?.password);
+    // verify password
+    const isValidPassword = await user.verifyLoginPassword(password);
     if (!isValidPassword) {
       // don't explicitly inform about invalid fields
       return res.status(400).send("ERROR : Invalid credentials!");
     }
 
     // generate auth token and set on res cookies for authentication
-    const authToken = await jwt.sign({ id: user?._id }, privateKey, {
-      expiresIn: "1d",
-    });
+    const authToken = await user.getJWTToken();
     console.log("User logged in is successfully!");
     // set auth token on cookies
     res.cookie("token", authToken, {
       // cookie will be removed after 1day
-      expires: new Date(Date.now() + 5000),
+      expires: new Date(Date.now() + 24 * 3600000),
     });
     return res.status(200).send("User login is successful!");
   } catch (err) {
-    console.log(`Err @ user signup : ${JSON.stringify(err)}`);
+    console.log(`Err @ user login : ${JSON.stringify(err)}`);
     return res
       .status(500)
       .send(`ERROR : ${err.message || "Something went wrong!"}`);

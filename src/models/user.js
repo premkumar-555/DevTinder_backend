@@ -1,6 +1,9 @@
 const mongoose = require("mongoose");
 const validator = require("validator");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const regExpns = require("./constants/regExpns");
+const privateKey = "DevTinder@1551";
 
 // user schema
 const userSchema = new mongoose.Schema(
@@ -36,7 +39,7 @@ const userSchema = new mongoose.Schema(
       required: [true, "emailId is required!"],
       trim: true,
       lowercase: true,
-      maxLength: [25, "Maximum length of emailId should be 25!"],
+      maxLength: [50, "Maximum length of emailId should be 25!"],
       validate: {
         validator: (v) => validator.isEmail(v),
         message: (props) => `${props?.path} is invalid!`,
@@ -98,5 +101,31 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// user schema helper methods
+
+// encrypt signup password
+userSchema.methods.getHashedPassword = async function (password) {
+  const hashedPassword = await bcrypt.hash(password, 10);
+  return hashedPassword;
+};
+
+// verify login password
+userSchema.methods.verifyLoginPassword = async function (passwordByUser) {
+  const user = this;
+  // check valid same password
+  const isValidPassword = await bcrypt.compare(passwordByUser, user?.password);
+  return isValidPassword;
+};
+
+// generate JWT user auth token
+userSchema.methods.getJWTToken = async function () {
+  const user = this;
+  // generate auth token return same
+  const authToken = await jwt.sign({ id: user?._id }, privateKey, {
+    expiresIn: "1d",
+  });
+  return authToken;
+};
 
 module.exports = mongoose.model("Users", userSchema);
