@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema(
     },
     lastName: {
       type: String,
+      required: [true, "lastName is required!"],
       trim: true,
       minLength: [4, "Minimum length of lastName should be 4!"],
       maxLength: [12, "Maximum length of lastName should be 12!"],
@@ -45,18 +46,10 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: [true, "password is required!"],
-      trim: true,
-      minLength: [8, "Minimum length of password should be 8!"],
-      maxLength: [12, "Maximum length of password should be 12!"],
-      validate: {
-        validator: (v) => validator.isStrongPassword(v),
-        message: (props) => `Provide strong ${props?.path}!`,
-      },
       cast: "'{PATH}' value is not a valid string!",
     },
     gender: {
       type: String,
-      required: [true, "gender is required!"],
       trim: true,
       lowercase: true,
       enum: {
@@ -78,6 +71,7 @@ const userSchema = new mongoose.Schema(
       maxLength: [100, "Maximum length of profileUrl should be 100!"],
       cast: "'{PATH}' value is not a valid string!",
       validate: {
+        // move it to api level validation @ patch api
         validator: (v) => validator.isURL(v),
         message: (props) => `${props?.path} is invalid!`,
       },
@@ -97,7 +91,7 @@ const userSchema = new mongoose.Schema(
         },
       ],
       validate: {
-        validator: (v) => v?.length >= 1 && v?.length <= 5,
+        validator: (v) => v?.length <= 5,
         message: (props) => `${props?.path} length should be between 1 to 5!`,
       },
     },

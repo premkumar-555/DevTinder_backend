@@ -1,18 +1,31 @@
 const express = require("express");
 const app = express();
+const bcrypt = require("bcrypt");
 const connectDB = require("./config/database");
 const User = require("./models/user");
 const { isObjectIdOrHexString } = require("mongoose");
+const { validateSignupData } = require("./middlewares/user");
 const port = 3000;
 
 // to transform json request to normal js object form
 app.use(express.json());
 
 // user signup api
-app.post("/signup", async (req, res) => {
+app.post("/signup", validateSignupData, async (req, res) => {
   try {
+    // extract req body payload
+    const { firstName, lastName, emailId, password } = req.body;
+
+    // encrypt password before saving to db
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     // creating a new user instance using user model
-    const user = new User(req.body);
+    const user = new User({
+      firstName,
+      lastName,
+      emailId,
+      password: hashedPassword,
+    });
     await user.save();
     console.log(`User signup is successful!`);
     return res.status(200).send("User signup is successful!");
