@@ -1,14 +1,20 @@
 const express = require("express");
 const app = express();
 const bcrypt = require("bcrypt");
+const { isObjectIdOrHexString } = require("mongoose");
+const cookieParser = require("cookie-parser");
+const jwt = require("jsonwebtoken");
 const connectDB = require("./config/database");
 const User = require("./models/user");
-const { isObjectIdOrHexString } = require("mongoose");
 const { validateSignupData, validateLoginData } = require("./middlewares/user");
 const port = 3000;
+const privateKey = "DevTinder@1551";
 
 // to transform json request to normal js object form
 app.use(express.json());
+
+// parse cookies head and populate req.cookies
+app.use(cookieParser());
 
 // user signup api
 app.post("/signup", validateSignupData, async (req, res) => {
@@ -42,7 +48,7 @@ app.post("/login", validateLoginData, async (req, res) => {
     // extract emailId and password
     const { emailId, password } = req.body;
     // check user exists for provided emailId
-    const user = await User.findOne({ emailId }, { _id: 0, password: 1 });
+    const user = await User.findOne({ emailId }, { password: 1 });
     if (!user) {
       // don't explicitly inform about invalid fields
       return res.status(400).send("ERROR : Invalid credentials!");
@@ -53,7 +59,12 @@ app.post("/login", validateLoginData, async (req, res) => {
       // don't explicitly inform about invalid fields
       return res.status(400).send("ERROR : Invalid credentials!");
     }
-    console.log(`User login is successful!`);
+
+    // generate auth token and set on res cookies for authentication
+    const authToken = await jwt.sign({ id: user?._id }, privateKey);
+    console.log("User logged in is successfully!");
+    // set auth token on cookies
+    res.cookie("token", authToken);
     return res.status(200).send("User login is successful!");
   } catch (err) {
     console.log(`Err @ user signup : ${JSON.stringify(err)}`);
@@ -177,6 +188,33 @@ app.patch("/user/:userId", async (req, res) => {
     }
   } catch (err) {
     console.log(`Err @ update user by Id : ${JSON.stringify(err)}`);
+    return res
+      .status(500)
+      .send(`ERROR : ${err.message || "Something went wrong!"}`);
+  }
+});
+
+// GET /profile
+app.get("/profile", async (req, res) => {
+  try {
+    // first check authentication
+    const { token } = req.cookies;
+    let decoded;
+    try {
+      decoded = await jwt.verify(token, privateKey);
+    } catch (error) {
+      return res
+        .status(400)
+        .send(`Auth ERROR : ${error?.message}, please login again!`);
+    }
+    // get user info and send in response back
+    const user = await User.findById(decoded?.id);
+    if (!user) {
+      return res.status(404).send("User not exists!");
+    }
+    return res.status(200).send(user);
+  } catch (err) {
+    console.log(`Err @ get /profile : ${JSON.stringify(err)}`);
     return res
       .status(500)
       .send(`ERROR : ${err.message || "Something went wrong!"}`);
