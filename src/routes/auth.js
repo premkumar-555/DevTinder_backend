@@ -2,7 +2,7 @@ const express = require("express");
 const {
   validateSignupData,
   validateLoginData,
-} = require("../middlewares/user");
+} = require("../middlewares/auth");
 const authRouter = express.Router();
 const User = require("../models/user");
 

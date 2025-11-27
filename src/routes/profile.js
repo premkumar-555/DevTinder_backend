@@ -2,9 +2,10 @@ const express = require("express");
 const { userAuth } = require("../middlewares/auth");
 const profileRouter = express.Router();
 const User = require("../models/user");
+const { validateProfileEditPayload } = require("../middlewares/profile");
 
 // GET user profile api
-profileRouter.get("/", userAuth, async (req, res) => {
+profileRouter.get("/view", userAuth, async (req, res) => {
   try {
     // access userInfo from request object and respond same
     const user = req?.userInfo;
@@ -16,5 +17,30 @@ profileRouter.get("/", userAuth, async (req, res) => {
       .send(`ERROR : ${err.message || "Something went wrong!"}`);
   }
 });
+
+// PATCH - /profile/edit
+profileRouter.patch(
+  "/edit",
+  userAuth,
+  validateProfileEditPayload,
+  async (req, res) => {
+    try {
+      // edit and respond back with latest updated user
+      const user = req?.userInfo || {};
+      const updatedUser = await User.findByIdAndUpdate(user?._id, req?.body, {
+        runValidators: true,
+        returnDocument: "after",
+      });
+      console.log("user profile udpated successful!");
+      res.status(200).json({
+        data: updatedUser,
+        message: "User profile udpated successfully!",
+      });
+    } catch (err) {
+      console.log(`Err @ /profile/edit : ${JSON.stringify(err)} `);
+      return res.status(500).send(err?.message || `Something went wrong!`);
+    }
+  }
+);
 
 module.exports = profileRouter;
