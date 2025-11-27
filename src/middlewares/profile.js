@@ -1,6 +1,6 @@
 const validator = require("validator");
 
-// validate /profil/edit payload
+// validate /profile/edit payload
 const validateProfileEditPayload = (req, res, next) => {
   try {
     // check for allowed edit fields
@@ -68,6 +68,53 @@ const validateProfileEditPayload = (req, res, next) => {
   }
 };
 
+// validate /profile/change/password
+const checkChangePasswordPayload = async (req, res, next) => {
+  try {
+    // check requirements
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword?.trim()) {
+      return res.status(400).send(`old password is required!`);
+    }
+    if (!newPassword?.trim()) {
+      return res.status(400).send(`new password is required!`);
+    }
+    // check both passwords strength
+    if (!validator.isStrongPassword(oldPassword?.trim())) {
+      return res.status(400).send(`Invalid old password!`);
+    }
+    if (!validator.isStrongPassword(newPassword?.trim())) {
+      return res.status(400).send(`Invalid new password!`);
+    }
+    // check new_password !== old_password
+    if (newPassword?.trim() === oldPassword?.trim()) {
+      return res.status(400).send(`Input passwords should not be same!`);
+    }
+    // check new_password !== user.password
+    const user = req?.userInfo;
+    const isNewPasswordMatched = await user.verifyLoginPassword(newPassword);
+    if (isNewPasswordMatched) {
+      console.log(
+        `checkChangePasswordPayload, new password is matched with user password`
+      );
+      return res
+        .status(400)
+        .send(`New password shouldn'\t be same as old saved password!`);
+    }
+    // check old_password === user.password
+    const isOldPasswordMatched = await user.verifyLoginPassword(oldPassword);
+    if (!isOldPasswordMatched) {
+      console.log(`checkChangePasswordPayload, old password is invalid!`);
+      return res.status(400).send(`Incorrect old password!`);
+    }
+    next();
+  } catch (err) {
+    console.log(`Err @ checkChangePasswordPayload : ${JSON.stringify(err)} `);
+    return res.status(500).send(err?.message || `Something went wrong!`);
+  }
+};
+
 module.exports = {
   validateProfileEditPayload,
+  checkChangePasswordPayload,
 };
