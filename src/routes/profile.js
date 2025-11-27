@@ -8,7 +8,7 @@ profileRouter.get("/", userAuth, async (req, res) => {
   try {
     // access userInfo from request object and respond same
     const user = req?.userInfo;
-    return res.status(200).send(user);
+    return res.status(200).json({ data: user });
   } catch (err) {
     console.log(`Err @ get /profile : ${JSON.stringify(err)}`);
     return res

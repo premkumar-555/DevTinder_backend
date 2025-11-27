@@ -21,7 +21,7 @@ authRouter.post("/signup", validateSignupData, async (req, res) => {
     user.password = await user.getHashedPassword(password);
     await user.save();
     console.log(`User signup is successful!`);
-    return res.status(200).send("User signup is successful!");
+    return res.status(200).json({ message: "User signup is successful!" });
   } catch (err) {
     console.log(`Err @ user signup : ${JSON.stringify(err)}`);
     return res
@@ -56,13 +56,23 @@ authRouter.post("/login", validateLoginData, async (req, res) => {
       // cookie will be removed after 1day
       expires: new Date(Date.now() + 24 * 3600000),
     });
-    return res.status(200).send("User login is successful!");
+    return res.status(200).json({ message: "User login is successful!" });
   } catch (err) {
     console.log(`Err @ user login : ${JSON.stringify(err)}`);
     return res
       .status(500)
       .send(`ERROR : ${err.message || "Something went wrong!"}`);
   }
+});
+
+// POST - auth logout api
+authRouter.post("/logout", (req, res) => {
+  // Clear the cookie 'id' at client
+  res
+    .clearCookie("token")
+    .status(200)
+    .json({ message: "User logged out successfully!" });
+  console.log("User logged out successfull!");
 });
 
 module.exports = authRouter;
