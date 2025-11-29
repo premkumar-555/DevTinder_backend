@@ -17,7 +17,7 @@ profileRouter.get("/view", userAuth, async (req, res) => {
     console.log(`Err @ get /profile : ${JSON.stringify(err)}`);
     return res
       .status(500)
-      .send(`ERROR : ${err.message || "Something went wrong!"}`);
+      .send(`ERROR : ${err?.message || "Something went wrong!"}`);
   }
 });
 

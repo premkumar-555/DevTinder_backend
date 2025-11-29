@@ -26,7 +26,7 @@ authRouter.post("/signup", validateSignupData, async (req, res) => {
     console.log(`Err @ user signup : ${JSON.stringify(err)}`);
     return res
       .status(500)
-      .send(`ERROR : ${err.message || "Something went wrong!"}`);
+      .send(`ERROR : ${err?.message || "Something went wrong!"}`);
   }
 });
 
@@ -61,7 +61,7 @@ authRouter.post("/login", validateLoginData, async (req, res) => {
     console.log(`Err @ user login : ${JSON.stringify(err)}`);
     return res
       .status(500)
-      .send(`ERROR : ${err.message || "Something went wrong!"}`);
+      .send(`ERROR : ${err?.message || "Something went wrong!"}`);
   }
 });
 

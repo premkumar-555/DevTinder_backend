@@ -3,7 +3,10 @@ const { userAuth } = require("../middlewares/auth");
 const requestRouter = express.Router();
 const User = require("../models/user");
 const ConnectionRequest = require("../models/connectionRequest");
-const { checkCreateConnectionReqParams } = require("../middlewares/request");
+const {
+  checkCreateConnectionReqParams,
+  checkReviewRequestParams,
+} = require("../middlewares/request");
 
 // POST - /request/send/:status/:toUserId - status : [interested, ignore]
 requestRouter.post(
@@ -58,7 +61,49 @@ requestRouter.post(
       console.log(`Err @  /send/:status/:toUserId : ${JSON.stringify(err)}`);
       return res
         .status(500)
-        .send(`ERROR : ${err.message || "Something went wrong!"}`);
+        .send(`ERROR : ${err?.message || "Something went wrong!"}`);
+    }
+  }
+);
+
+// POST /request/review/:status/:requestId - status : [accepted, rejected]
+requestRouter.post(
+  "/review/:status/:requestId",
+  userAuth,
+  checkReviewRequestParams,
+  async (req, res) => {
+    try {
+      // Handle critical edge cases before update, eg : fromUserId == requestId ==> toUserId
+      // 1. Logged in  userId should be toUserId of the request
+      // 2. Target request status should be 'interested'
+      // 3. Connection request should exist with _id : requestId
+      const loggedInUser = req.userInfo;
+      const { status, requestId } = req.params;
+      const conReq = await ConnectionRequest.findOne({
+        _id: requestId,
+        toUserId: loggedInUser._id,
+        status: "interested",
+      });
+      // if connection request not exists deny update
+      if (!conReq) {
+        console.log(`connection request not exists!`);
+        return res
+          .status(400)
+          .send({ message: "Connection request not exists!" });
+      }
+      // else allow to accept or reject
+      conReq.status = status;
+      await conReq.save();
+      console.log(`Connection request ${status} successfully`);
+      return res.status(200).send({
+        data: conReq,
+        message: `Connection request ${status} successfully!`,
+      });
+    } catch (err) {
+      console.log(`Err @  /review/:status/:requestId : ${JSON.stringify(err)}`);
+      return res
+        .status(500)
+        .send(`ERROR : ${err?.message || "Something went wrong!"}`);
     }
   }
 );
