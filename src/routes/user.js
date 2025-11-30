@@ -53,18 +53,25 @@ userRouter.get("/connections", userAuth, async (req, res) => {
     )
       .populate({
         path: "fromUserId",
-        match: { _id: { $ne: loggedInUser._id } }, // Join condition on ref document
-        as: "user",
+        match: { _id: { $ne: loggedInUser._id } }, // match conditions on ref document fields
         select: SELECTIVE_REF_FIELDS,
+        transform: function (doc, id) {
+          return doc === null ? id : doc;
+        },
       })
       .populate({
         path: "toUserId",
-        match: { _id: { $ne: loggedInUser._id } }, // Join condition on ref document
+        match: { _id: { $ne: loggedInUser._id } }, // match conditions on ref document fields
         select: SELECTIVE_REF_FIELDS,
+        transform: function (doc, id) {
+          return doc === null ? id : doc;
+        },
       });
     if (conReqs?.length > 0) {
       conReqs = conReqs.map(({ fromUserId, toUserId }) =>
-        fromUserId && fromUserId?._id ? fromUserId : toUserId
+        fromUserId?.toString() !== loggedInUser?._id.toString()
+          ? fromUserId
+          : toUserId
       );
     }
     return res.status(200).send({ data: conReqs });
