@@ -127,4 +127,4 @@ userSchema.methods.getJWTToken = async function () {
   return authToken;
 };
 
-module.exports = mongoose.model("Users", userSchema);
+module.exports = mongoose.model("User", userSchema);
