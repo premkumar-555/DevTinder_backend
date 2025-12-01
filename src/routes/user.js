@@ -83,4 +83,51 @@ userRouter.get("/connections", userAuth, async (req, res) => {
   }
 });
 
+// GET /user/feed : api to fetch and feed users data to loggedInuser
+userRouter.get("/feed", userAuth, async (req, res) => {
+  try {
+    // Edge cases to fetch and feed users to loggedInUser
+    // 1. Except loggedInUser, all users should be shown.
+    /** 2. Except users, who already have a connection having status of either
+     * [interested, ignored, accepted, rejected] with current loggedInUser,
+     * all users should be shown.
+     * */
+    const loggedInUser = req.userInfo;
+    // fetch all users with whom loggedInUser having connections in any status
+    const connections = await ConnectionRequest.find({
+      $or: [{ fromUserId: loggedInUser._id }, { toUserId: loggedInUser._id }],
+    })
+      .populate({
+        path: "fromUserId",
+        match: {
+          _id: { $ne: loggedInUser._id }, // populate if not loggedInUser
+        },
+        select: "_id",
+      })
+      .populate({
+        path: "toUserId",
+        match: {
+          _id: { $ne: loggedInUser._id }, // populate if not loggedInUser
+        },
+        select: "_id",
+      })
+      .select(["fromUserId", "toUserId"]);
+    // extract not required userIds
+    const avoidUserIds = connections?.map(({ fromUserId, toUserId }) =>
+      fromUserId && fromUserId?._id ? fromUserId._id : toUserId._id
+    );
+    // include loggedInUserId also in avoidUserIds array
+    avoidUserIds.push(loggedInUser._id);
+    const users = await User.find({
+      _id: { $nin: avoidUserIds },
+    }).select(SELECTIVE_REF_FIELDS);
+    return res.status(200).send({ data: users });
+  } catch (err) {
+    console.log(`Err @  /user/feed : ${JSON.stringify(err)}`);
+    return res
+      .status(500)
+      .send(`ERROR : ${err?.message || "Something went wrong!"}`);
+  }
+});
+
 module.exports = userRouter;
