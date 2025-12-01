@@ -93,6 +93,11 @@ userRouter.get("/feed", userAuth, async (req, res) => {
      * all users should be shown.
      * */
     const loggedInUser = req.userInfo;
+    let limit = parseInt(req.query?.limit) || 10;
+    limit = limit > 50 ? 50 : limit; // Restricting larger limit value
+    const page = parseInt(req.query?.page) || 1;
+    const skip = (page - 1) * limit;
+
     // fetch all users with whom loggedInUser having connections in any status
     const connections = await ConnectionRequest.find({
       $or: [{ fromUserId: loggedInUser._id }, { toUserId: loggedInUser._id }],
@@ -120,7 +125,10 @@ userRouter.get("/feed", userAuth, async (req, res) => {
     avoidUserIds.push(loggedInUser._id);
     const users = await User.find({
       _id: { $nin: avoidUserIds },
-    }).select(SELECTIVE_REF_FIELDS);
+    })
+      .select(SELECTIVE_REF_FIELDS)
+      .skip(skip)
+      .limit(limit);
     return res.status(200).send({ data: users });
   } catch (err) {
     console.log(`Err @  /user/feed : ${JSON.stringify(err)}`);
