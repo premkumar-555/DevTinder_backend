@@ -1,9 +1,18 @@
 const express = require("express");
 const app = express();
 const cookieParser = require("cookie-parser");
+const cors = require("cors");
 const connectDB = require("./config/database");
 const port = 3000;
 const routers_array = require("./routes/routers");
+
+// Enable CORS
+app.use(
+  cors({
+    origin: "http://localhost:5173", // Allow only a specific origin
+    credentials: true, // Enable cookies and credentials
+  })
+);
 
 // to transform json request to normal js object form
 app.use(express.json());

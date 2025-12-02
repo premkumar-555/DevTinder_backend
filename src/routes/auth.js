@@ -36,16 +36,20 @@ authRouter.post("/login", validateLoginData, async (req, res) => {
     // extract emailId and password
     const { emailId, password } = req.body;
     // check user exists for provided emailId
-    const user = await User.findOne({ emailId }, { password: 1 });
+    const user = await User.findOne({ emailId });
     if (!user) {
       // don't explicitly inform about invalid fields
-      return res.status(400).send("ERROR : Invalid credentials!");
+      return res
+        .status(400)
+        .send({ error: true, message: "Invalid credentials!" });
     }
     // verify password
     const isValidPassword = await user.verifyLoginPassword(password);
     if (!isValidPassword) {
       // don't explicitly inform about invalid fields
-      return res.status(400).send("ERROR : Invalid credentials!");
+      return res
+        .status(400)
+        .send({ error: true, message: "Invalid credentials!" });
     }
 
     // generate auth token and set on res cookies for authentication
@@ -56,7 +60,15 @@ authRouter.post("/login", validateLoginData, async (req, res) => {
       // cookie will be removed after 1day
       expires: new Date(Date.now() + 24 * 3600000),
     });
-    return res.status(200).json({ message: "User login is successful!" });
+    const userData = user?.toObject();
+    if (userData?.password) {
+      delete userData?.password;
+      console.log("/login, removed password before response to client");
+    }
+    return res.status(200).json({
+      data: userData,
+      message: "User login is successful!",
+    });
   } catch (err) {
     console.log(`Err @ user login : ${JSON.stringify(err)}`);
     return res
