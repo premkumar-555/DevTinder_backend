@@ -11,6 +11,7 @@ const SELECTIVE_REF_FIELDS = [
   "gender",
   "about",
   "skills",
+  "profileUrl",
 ];
 
 // GET /user/review/requests/received : fetch connection requests received

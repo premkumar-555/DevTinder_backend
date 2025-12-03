@@ -8,13 +8,14 @@ const userAuth = async (req, res, next) => {
     // extract auth token from req cookies and verify it
     const { token } = req.cookies;
     if (!token) {
-      throw new Error("Invalid token");
+      return res.status(401).send("Auth Failed, Please login again!");
     }
     const decoded = await jwt.verify(token, privateKey);
     // check user
     const user = await User.findById(decoded?.id);
     if (!user) {
-      throw new Error("User not exists");
+      res.clearCookie("token");
+      return res.status(401).send("Auth Failed, Please login again!");
     }
     // set user data on request body
     req.userInfo = user;

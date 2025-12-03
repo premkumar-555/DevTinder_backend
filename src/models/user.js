@@ -70,7 +70,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default:
         "https://png.pngtree.com/png-vector/20190710/ourmid/pngtree-user-vector-avatar-png-image_1541962.jpg",
-      maxLength: [100, "Maximum length of profileUrl should be 100!"],
+      maxLength: [500, "Maximum length of profileUrl should be 100!"],
       cast: "'{PATH}' value is not a valid string!",
       validate: {
         // move it to api level validation @ patch api
@@ -83,6 +83,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       maxLength: [100, "Maximum length of '{PATH}' should be 50!"],
       cast: "'{PATH}' value is not a valid string!",
+      default: "This is sample about of the user",
     },
     skills: {
       type: [
