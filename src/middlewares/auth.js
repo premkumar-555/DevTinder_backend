@@ -58,7 +58,7 @@ const validateSignupData = (req, res, next) => {
     next();
   } catch (err) {
     console.log(`Err @ validateSignupData : ${JSON.stringify(err)}`);
-    res.status(400).send(`ERROR : ${err?.message || "Something went wrong!"}`);
+    res.status(400).send({ message: err?.message || "Something went wrong!" });
   }
 };
 
@@ -82,7 +82,7 @@ const validateLoginData = (req, res, next) => {
     next();
   } catch (err) {
     console.log(`Err @ validateLoginData : ${JSON.stringify(err)}`);
-    res.status(400).send(`ERROR : ${err?.message || "Something went wrong!"}`);
+    res.status(400).send({ message: err?.message || "Something went wrong!" });
   }
 };
 
