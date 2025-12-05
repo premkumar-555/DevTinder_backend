@@ -55,7 +55,7 @@ requestRouter.post(
       console.log("Connection request created successfully");
       return res.status(200).send({
         data: conReq,
-        message: "Connection request created successfully!",
+        message: "Connection request sent successfully!",
       });
     } catch (err) {
       console.log(`Err @  /send/:status/:toUserId : ${JSON.stringify(err)}`);
