@@ -20,8 +20,12 @@ authRouter.post("/signup", validateSignupData, async (req, res) => {
     // encrypt password before saving to db
     user.password = await user.getHashedPassword(password);
     await user.save();
+    // generate auth token and set on res cookies for authentication
+    await setAuthToken(user, res);
     console.log(`User signup is successful!`);
-    return res.status(200).json({ message: "User signup is successful!" });
+    return res
+      .status(200)
+      .json({ data: user, message: "User signup is successful!" });
   } catch (err) {
     console.log(`Err @ user signup : ${JSON.stringify(err)}`);
     return res
@@ -53,13 +57,7 @@ authRouter.post("/login", validateLoginData, async (req, res) => {
     }
 
     // generate auth token and set on res cookies for authentication
-    const authToken = await user.getJWTToken();
-    console.log("User logged in is successfully!");
-    // set auth token on cookies
-    res.cookie("token", authToken, {
-      // cookie will be removed after 1day
-      expires: new Date(Date.now() + 24 * 3600000),
-    });
+    await setAuthToken(user, res);
     const userData = user?.toObject();
     if (userData?.password) {
       delete userData?.password;
@@ -76,6 +74,23 @@ authRouter.post("/login", validateLoginData, async (req, res) => {
       .send(`ERROR : ${err?.message || "Something went wrong!"}`);
   }
 });
+
+// Create JWT token and set cookie
+const setAuthToken = async (user, res) => {
+  try {
+    // generate auth token and set on res cookies for authentication
+    const authToken = await user.getJWTToken();
+    console.log("Created auth token successfully!");
+    // set auth token on cookies
+    res.cookie("token", authToken, {
+      // cookie will be removed after 1day
+      expires: new Date(Date.now() + 24 * 3600000),
+    });
+    console.log("Set auth token in response object!");
+  } catch (err) {
+    throw new Error(err);
+  }
+};
 
 // POST - auth logout api
 authRouter.post("/logout", (req, res) => {

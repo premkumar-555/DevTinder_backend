@@ -11,7 +11,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "firstName is required!"],
       trim: true,
-      minLength: [4, "Minimum length of firstName should be 4!"],
+      minLength: [3, "Minimum length of firstName should be 4!"],
       maxLength: [12, "Maximum length of firstName should be 12!"],
       // to customize type casting error message
       cast: "'{PATH}' value is not a valid string!",
@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "lastName is required!"],
       trim: true,
-      minLength: [4, "Minimum length of lastName should be 4!"],
+      minLength: [3, "Minimum length of lastName should be 4!"],
       maxLength: [12, "Maximum length of lastName should be 12!"],
       cast: "'{PATH}' value is not a valid string!",
       validate: {
