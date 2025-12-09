@@ -14,6 +14,9 @@ const SELECTIVE_REF_FIELDS = [
   "profileUrl",
 ];
 
+const INTERESTED = "interested";
+const ACCEPTED = "accepted";
+
 // GET /user/review/requests/received : fetch connection requests received
 userRouter.get("/requests/received", userAuth, async (req, res) => {
   try {
@@ -24,7 +27,7 @@ userRouter.get("/requests/received", userAuth, async (req, res) => {
     const conReqs = await ConnectionRequest.find(
       {
         toUserId: loggedInUser._id,
-        status: "interested",
+        status: INTERESTED,
       },
       { toUserId: 0, status: 0, __v: 0 }
     ).populate("fromUserId", SELECTIVE_REF_FIELDS);
@@ -48,7 +51,7 @@ userRouter.get("/connections", userAuth, async (req, res) => {
     let conReqs = await ConnectionRequest.find(
       {
         $or: [{ fromUserId: loggedInUser._id }, { toUserId: loggedInUser._id }],
-        status: "accepted",
+        status: ACCEPTED,
       },
       { fromUserId: 1, toUserId: 1 }
     )

@@ -1,18 +1,14 @@
 const express = require("express");
 const { userAuth } = require("../middlewares/auth");
 const requestRouter = express.Router();
-const User = require("../models/user");
 const ConnectionRequest = require("../models/connectionRequest");
 const {
   checkCreateConnectionReqParams,
   checkReviewRequestParams,
 } = require("../middlewares/request");
 const getMailTemplate = require("../emailTemplates/sentRequest");
-const sendSESMail = require("../utils/sendEmail");
+const sendSESMail = require("../utils/sendEmail.js");
 const INTERESTED = "interested";
-const mailReceiver = "Premkumar";
-const toMailAddress = "premkumarhulikoppe@gmail.com";
-const appName = "devTinder";
 
 // POST - /request/send/:status/:toUserId - status : [interested, ignore]
 requestRouter.post(
@@ -63,13 +59,13 @@ requestRouter.post(
         await conReq.populate({ path: "toUserId", select: "firstName _id" });
         // SEND SES MAIL TO ADMIN
         const mailBody = await getMailTemplate(
-          mailReceiver,
+          process.env.EMAIL_RECEIVER_USER_NAME,
           req?.userInfo?.firstName || "",
           conReq?.toUserId?.firstName || "",
-          appName
+          process.env.APP_NAME
         );
         const mailSendRes = await sendSESMail.run(
-          toMailAddress,
+          process.env.RECEIVER_EMAIL_ID,
           "New Connection Request",
           mailBody
         );

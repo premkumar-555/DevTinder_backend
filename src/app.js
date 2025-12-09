@@ -1,12 +1,12 @@
-// Enabling dotenv config at very first to load env variables
-require("dotenv").config();
-
 const express = require("express");
 const app = express();
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
+// Enabling dotenv config at very first to load env variables
+require("dotenv").config();
+
 const connectDB = require("./config/database");
-const port = 3000;
+const port = process.env.PORT;
 const routers_array = require("./routes/routers");
 
 // Enable CORS

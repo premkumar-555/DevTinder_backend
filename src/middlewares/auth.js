@@ -1,7 +1,6 @@
 const validator = require("validator");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
-const privateKey = "DevTinder@1551";
 
 const userAuth = async (req, res, next) => {
   try {
@@ -10,7 +9,7 @@ const userAuth = async (req, res, next) => {
     if (!token) {
       return res.status(401).send("Auth Failed, Please login again!");
     }
-    const decoded = await jwt.verify(token, privateKey);
+    const decoded = await jwt.verify(token, process.env.JWT_PRIVATE_KEY);
     // check user
     const user = await User.findById(decoded?.id);
     if (!user) {
