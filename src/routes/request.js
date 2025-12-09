@@ -7,6 +7,12 @@ const {
   checkCreateConnectionReqParams,
   checkReviewRequestParams,
 } = require("../middlewares/request");
+const getMailTemplate = require("../emailTemplates/sentRequest");
+const sendSESMail = require("../utils/sendEmail");
+const INTERESTED = "interested";
+const mailReceiver = "Premkumar";
+const toMailAddress = "premkumarhulikoppe@gmail.com";
+const appName = "devTinder";
 
 // POST - /request/send/:status/:toUserId - status : [interested, ignore]
 requestRouter.post(
@@ -21,7 +27,7 @@ requestRouter.post(
        * a) fromUserId ==> toUserId OR toUserId ==> fromUserId (only one connection request should be allowed between two unique users)
        * b) If exists deny creation request, else continue further
        */
-      const fromUserId = req?.userInfo || "";
+      const fromUserId = req?.userInfo?._id || "";
       const { status, toUserId } = req.params;
       const request = await ConnectionRequest.findOne(
         {
@@ -53,12 +59,38 @@ requestRouter.post(
       });
       await conReq.save();
       console.log("Connection request created successfully");
+      if (status === INTERESTED) {
+        await conReq.populate({ path: "toUserId", select: "firstName _id" });
+        // SEND SES MAIL TO ADMIN
+        const mailBody = await getMailTemplate(
+          mailReceiver,
+          req?.userInfo?.firstName || "",
+          conReq?.toUserId?.firstName || "",
+          appName
+        );
+        const mailSendRes = await sendSESMail.run(
+          toMailAddress,
+          "New Connection Request",
+          mailBody
+        );
+        console.log(
+          "AWS SES EMAIL SEND RESPONSE : ",
+          JSON.stringify(mailSendRes)
+        );
+        if (mailSendRes?.$metadata?.httpStatusCode === 200) {
+          console.log(`AWS SES mail sent successfully`);
+        }
+      }
       return res.status(200).send({
         data: conReq,
         message: "Connection request sent successfully!",
       });
     } catch (err) {
-      console.log(`Err @  /send/:status/:toUserId : ${JSON.stringify(err)}`);
+      console.log(
+        `Err @  /send/:status/:toUserId : ${JSON.stringify(err)}, ${
+          err?.message && "\n error message : " + err?.message
+        } `
+      );
       return res
         .status(500)
         .send(`ERROR : ${err?.message || "Something went wrong!"}`);

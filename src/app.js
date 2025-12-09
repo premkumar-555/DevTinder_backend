@@ -1,3 +1,6 @@
+// Enabling dotenv config at very first to load env variables
+require("dotenv").config();
+
 const express = require("express");
 const app = express();
 const cookieParser = require("cookie-parser");
