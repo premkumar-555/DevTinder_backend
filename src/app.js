@@ -8,6 +8,8 @@ require("dotenv").config();
 const connectDB = require("./config/database");
 const port = process.env.PORT;
 const routers_array = require("./routes/routers");
+// Initiating cron jobs
+require("./cronJobs/main.cron");
 
 // Enable CORS
 app.use(
