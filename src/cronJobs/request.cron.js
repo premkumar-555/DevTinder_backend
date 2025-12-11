@@ -158,7 +158,4 @@ async function listenEmailQueue() {
   });
 }
 
-// REMOVE LATER (TESTING ONLY)
-notifyRequestReceivers.execute();
-
 module.exports = [notifyRequestReceivers];
