@@ -11,22 +11,7 @@ const EMAIL_QUEUE = "emailQueue";
 const connection = new IORedis({
   maxRetriesPerRequest: null,
 });
-
-// Global emailQueue to process bulk email sending
-// then will add jobs to it in each cron job iteration
-const emailQueue = new Queue(EMAIL_QUEUE, {
-  connection,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: "fixed",
-      delay: 1000,
-    },
-  },
-});
-
-// Global worker to subscribe emailQueue & process queue jobs
-listenEmailQueue();
+const { workersRegistry } = require("./utility.js");
 
 // cron job to execute at 8AM daily to send mail notifications to
 // users who received connection requests previous day
@@ -49,9 +34,29 @@ const notifyRequestReceivers = cron.createTask(
     if (pendingReqs.length > 0) {
       // 3.Segreate records based on receiver emailIds using Map data structure
       const usersMap = groupByReceiverEmailId(pendingReqs);
+      // 4.Create message queue to handle bulk emailing
+      const emailQueue = new Queue(EMAIL_QUEUE, {
+        connection,
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: "fixed",
+            delay: 1000,
+          },
+        },
+      });
       // 4.Process emailing using message queue
       // a) add jobs to emailQueue
       await addJobsToQueue(emailQueue, usersMap);
+      // b) create worker to listen emailQueue, if not exists only
+      if (!workersRegistry.has(EMAIL_QUEUE)) {
+        listenEmailQueue();
+        // register on workersRegistry
+        workersRegistry.add(EMAIL_QUEUE);
+        console.log(`Initiating worker for emailQueue...`);
+      } else {
+        console.log(`emailQueue worker already exists*`);
+      }
     }
   },
   {
