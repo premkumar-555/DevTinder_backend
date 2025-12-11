@@ -26,11 +26,13 @@
   "dependencies": {
     "@aws-sdk/client-ses": "^3.947.0",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.65.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.0.0",
     "node-cron": "^4.2.1",
