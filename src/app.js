@@ -1,5 +1,7 @@
 const express = require("express");
+const { createServer } = require("http");
 const app = express();
+const httpServer = createServer(app);
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 // Enabling dotenv config at very first to load env variables
@@ -18,6 +20,10 @@ app.use(
     credentials: true, // Enable cookies and credentials
   })
 );
+
+// Initialize Socket.io for real-time communication
+const initializeSocket = require("./utils/socket");
+initializeSocket(httpServer);
 
 // to transform json request to normal js object form
 app.use(express.json());
@@ -39,7 +45,7 @@ if (routers_array?.length > 0) {
 connectDB()
   .then(() => {
     console.log(`Connected to database successfully`);
-    app.listen(port, () => {
+    httpServer.listen(port, () => {
       console.log(`Server listening on port ${port}`);
     });
   })
