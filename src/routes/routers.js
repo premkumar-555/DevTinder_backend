@@ -1,4 +1,5 @@
 const authRouter = require("./auth");
+const chatRouter = require("./chat");
 const profileRouter = require("./profile");
 const requestRouter = require("./request");
 const userRouter = require("./user");
@@ -13,6 +14,7 @@ const routers_array = [
   { path: "/profile", controller: profileRouter },
   { path: "/request", controller: requestRouter },
   { path: "/user", controller: userRouter },
+  { path: "/chat", controller: chatRouter },
 ];
 
 module.exports = routers_array;
