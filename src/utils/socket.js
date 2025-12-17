@@ -2,6 +2,7 @@ const { Server } = require("socket.io");
 const JWT = require("jsonwebtoken");
 const UserModel = require("../models/user");
 const ChatModel = require("../models/chat");
+const ConReqModel = require("../models/connectionRequest");
 const { isValidObjectId } = require("./common");
 const { default: mongoose } = require("mongoose");
 
@@ -75,10 +76,11 @@ const initializeSocket = (httpServer) => {
       }
     };
 
-    // Handle joining a room for chat
-    socket.on("joinRoom", async (toUserId) => {
+    // Handle validations at socket join & socket messaging
+    // 1. users should be valid users
+    // 2. users should have connection with each other to chat
+    const checkUsersIdentity = async (toUserId) => {
       try {
-        // 1. Verify users identity from db
         const normalObjectIds = normalizeObjectIds([
           socket?.userInfo?._id,
           toUserId,
@@ -89,6 +91,31 @@ const initializeSocket = (httpServer) => {
         if (usersCount !== 2) {
           return socket.emit("error", "Invalid users!");
         }
+        // check connected users
+        const connection = await ConReqModel.findOne({
+          $or: [
+            { fromUserId: normalObjectIds[0], toUserId: normalObjectIds[1] },
+            { fromUserId: normalObjectIds[1], toUserId: normalObjectIds[0] },
+          ],
+        }).select("_id");
+        if (!connection) {
+          return socket.emit("error", "Invalid users!");
+        }
+      } catch (err) {
+        console.log(
+          `Error @ checkUsersIdentity : ${JSON.stringify(
+            err
+          )}, error message : ${err?.message}`
+        );
+        return socket.emit("error", err?.message || "Something went wrong!");
+      }
+    };
+
+    // Handle joining a room for chat
+    socket.on("joinRoom", async (toUserId) => {
+      try {
+        // 1. Verify users identity
+        await checkUsersIdentity(toUserId);
         // 2. fetch roomId
         const roomId = await getChatID(toUserId, "joinRoom");
         // 3. Join socket to room
@@ -106,8 +133,22 @@ const initializeSocket = (httpServer) => {
 
     // Handle sending messages
     socket.on("sendMessage", async ({ toUserId, message }) => {
+      // 1. Verify users identity
+      await checkUsersIdentity(toUserId);
+      // 2. Get room Id
       const roomId = await getChatID(toUserId, "sendMessage", message);
+      // 3. Broadcast message
       broadCastMessage(roomId, { toUserId, message });
+    });
+
+    // Handle user typing event
+    socket.on("typing", async (toUserId) => {
+      // 1. Verify users identity
+      await checkUsersIdentity(toUserId);
+      // 2. Get room Id
+      const roomId = await getChatID(toUserId, "sendMessage");
+      // 3. Broadcast message except current typing user
+      socket.to(roomId).emit("receiveTyping");
     });
 
     socket.on("disconnect", () => {
