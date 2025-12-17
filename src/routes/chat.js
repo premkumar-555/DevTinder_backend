@@ -15,22 +15,16 @@ chatRouter.post(
       // 1. Fetch chat for users from db
       let chat = await ChatModel.findOne({
         participants: { $all: [req.userInfo._id, ...req.body.users] },
-      }).populate({
-        path: "messages.fromUser",
-        select: ["firstName", "lastName", "profileUrl"],
-      });
-      // a) If chat not exists, create new one for users
+      })
+        .populate({
+          path: "messages.fromUser",
+          select: ["firstName", "lastName", "profileUrl"],
+        })
+        .select({ __v: 0, participants: 0 });
+      // 2. If not chat exists, mimic empty chat response
       if (!chat) {
-        chat = new ChatModel({
-          participants: [req.userInfo._id, ...req.body.users],
-          messages: [],
-        });
-        await chat.save();
+        chat = { messages: [] };
       }
-      // b) else respond the existing chat
-      // exclude unnecessary fields before sending response
-      chat = chat.toObject();
-      ["__v", "participants"].forEach((field) => delete chat[field]);
       return res.status(200).json({ data: chat });
     } catch (err) {
       console.log(`Err @ /chat/view : ${JSON.stringify(err)}`);

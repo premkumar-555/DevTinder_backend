@@ -1,6 +1,9 @@
 const { Server } = require("socket.io");
 const JWT = require("jsonwebtoken");
 const UserModel = require("../models/user");
+const ChatModel = require("../models/chat");
+const { isValidObjectId } = require("./common");
+const { default: mongoose } = require("mongoose");
 
 const initializeSocket = (httpServer) => {
   const io = new Server(httpServer, {
@@ -14,27 +17,101 @@ const initializeSocket = (httpServer) => {
 
   // Listen and handle socket connections
   io.on("connection", (socket) => {
+    console.log(`Socket ${socket.id} connected to server`);
+
+    // function to broadcast messages to chat room
+    const broadCastMessage = (roomId, data) => {
+      // check to deny broadcast
+      const isInvalid =
+        !roomId ||
+        !data ||
+        !["toUserId", "message"].every((key) => !!data[key]);
+      if (isInvalid) {
+        return;
+      }
+      // else emit message to room
+      io.to(roomId).emit("receiveMessage", {
+        fromUser: socket.userInfo,
+        message: data.message,
+        createdAt: new Date().toUTCString(),
+      });
+    };
+
+    // To Fetch and update chat messages
+    const getChatID = async (toUserId, eventName = "", message = "") => {
+      try {
+        // 1. Find chat exists or not
+        const normalObjectIds = normalizeObjectIds([
+          socket?.userInfo?._id,
+          toUserId,
+        ]);
+        let chat = await ChatModel.findOne({
+          participants: { $all: [...normalObjectIds] },
+        });
+        // a) If no chat, create new one at 'joinRoom' event as it emit first
+        if (!chat && eventName === "joinRoom") {
+          chat = new ChatModel({
+            participants: [...normalObjectIds],
+            messages: [],
+          });
+        }
+        // b) update chat on new messages
+        if (chat && eventName === "sendMessage" && !!message) {
+          chat.messages.push({
+            fromUser: socket?.userInfo?._id,
+            message,
+          });
+        }
+        await chat.save();
+        const roomId = chat._id.toString();
+        return roomId;
+      } catch (err) {
+        console.log(
+          `Error @ chatUpdateBroadcast : ${JSON.stringify(
+            err
+          )}, error message : ${err?.message}`
+        );
+        return socket.emit("error", err?.message || "Something went wrong!");
+      }
+    };
+
     // Handle joining a room for chat
-    socket.on("joinRoom", (toUserId) => {
-      // create unique room ID based on user IDs
-      const roomId = getUniqueRoomId([socket?.userInfo?._id, toUserId]);
-      socket.join(roomId);
-      console.log(`Socket ${socket.id}, joined room: ${roomId}`);
+    socket.on("joinRoom", async (toUserId) => {
+      try {
+        // 1. Verify users identity from db
+        const normalObjectIds = normalizeObjectIds([
+          socket?.userInfo?._id,
+          toUserId,
+        ]);
+        const usersCount = await UserModel.countDocuments({
+          _id: { $in: [...normalObjectIds] },
+        }).select("id");
+        if (usersCount !== 2) {
+          return socket.emit("error", "Invalid users!");
+        }
+        // 2. fetch roomId
+        const roomId = await getChatID(toUserId, "joinRoom");
+        // 3. Join socket to room
+        socket.join(roomId);
+        console.log(`Socket : ${socket.id}, joined room`);
+      } catch (err) {
+        console.log(
+          `Error @ joinRoom, socket : ${socket.id}, err : ${JSON.stringify(
+            err
+          )}, message : ${err?.message}`
+        );
+        return socket.emit("error", err?.message || "Something went wrong!");
+      }
     });
 
     // Handle sending messages
-    socket.on("sendMessage", ({ toUserId, message }) => {
-      // broadcast message to all clients in the room
-      const roomId = getUniqueRoomId([socket?.userInfo?._id, toUserId]);
-      io.to(roomId).emit("receiveMessage", {
-        from: socket.userInfo,
-        toUserId,
-        message,
-      });
+    socket.on("sendMessage", async ({ toUserId, message }) => {
+      const roomId = await getChatID(toUserId, "sendMessage", message);
+      broadCastMessage(roomId, { toUserId, message });
     });
 
     socket.on("disconnect", () => {
-      console.log(`Client disconnected: ${socket.id}`);
+      console.log(`Socket : ${socket.id}, disconnected`);
     });
   });
 };
@@ -60,8 +137,6 @@ const socketAuthMiddleware = async (socket, next) => {
     if (!user) {
       return next(new Error("Authentication error : invalid user!"));
     }
-    user.name = `${user.firstName} ${user.lastName}`;
-    ["firstName", "lastName"].forEach((field) => delete user[field]);
     socket.userInfo = user;
     next();
   } catch (err) {
@@ -74,7 +149,11 @@ const socketAuthMiddleware = async (socket, next) => {
   }
 };
 
-const getUniqueRoomId = (users) => {
-  return users.sort().join("_");
+// Normalize user ids to mongo objectIds
+const normalizeObjectIds = (ids) => {
+  return ids
+    ?.filter(isValidObjectId)
+    ?.map((id) => new mongoose.Types.ObjectId(id));
 };
+
 module.exports = initializeSocket;

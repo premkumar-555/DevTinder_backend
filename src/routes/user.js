@@ -78,6 +78,7 @@ userRouter.get("/connections", userAuth, async (req, res) => {
           : toUserId
       );
     }
+
     return res.status(200).send({ data: conReqs });
   } catch (err) {
     console.log(`Err @  /user/connections : ${JSON.stringify(err)}`);

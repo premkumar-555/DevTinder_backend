@@ -8,7 +8,7 @@ const messageSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    text: { type: String, required: true },
+    message: { type: String, required: true },
   },
   { timestamps: true }
 );
