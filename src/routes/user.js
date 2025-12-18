@@ -5,6 +5,7 @@ const ConnectionRequest = require("../models/connectionRequest");
 const userRouter = express.Router();
 
 const SELECTIVE_REF_FIELDS = [
+  "_id",
   "firstName",
   "lastName",
   "age",

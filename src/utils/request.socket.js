@@ -48,13 +48,24 @@ const requestsNameSpaceSetup = (io, authMiddleware) => {
     requestNameSpace.on("connection", (socket) => {
       console.log(`socket : ${socket?.id} connected to request socket channel`);
 
-      // listen any new
+      // listen any new connection request
       socket.on("sendConnectionRequest", async (toUserId) => {
         // 1. Auth checks on userIds
         await checkUsersIdentity(toUserId, socket);
 
         // 2. Emit connectioRequest event to all sockets except sender
         socket.broadcast.emit("receiveConnectionRequest", {
+          toUserId,
+          fromUserInfo: socket?.userInfo,
+        });
+      });
+
+      socket.on("acceptRequest", async (toUserId) => {
+        // 1. Auth checks on userIds
+        await checkUsersIdentity(toUserId, socket);
+
+        // 2. Emit connectioRequest event to all sockets except sender
+        socket.broadcast.emit("requestAccepted", {
           toUserId,
           fromUserInfo: socket?.userInfo,
         });
