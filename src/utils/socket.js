@@ -3,8 +3,8 @@ const JWT = require("jsonwebtoken");
 const UserModel = require("../models/user");
 const ChatModel = require("../models/chat");
 const ConReqModel = require("../models/connectionRequest");
-const { isValidObjectId } = require("./common");
-const { default: mongoose } = require("mongoose");
+const { isValidObjectId, normalizeObjectIds } = require("./common");
+const { socketChannelsSetups } = require("./channels.socket");
 
 const initializeSocket = (httpServer) => {
   const io = new Server(httpServer, {
@@ -12,6 +12,17 @@ const initializeSocket = (httpServer) => {
       origin: "http://localhost:5173",
     },
   });
+
+  // Setup Socket Channels (sub-sockets)
+  try {
+    socketChannelsSetups.forEach((channelSetter) => {
+      if (!!channelSetter && !!io) {
+        channelSetter(io, socketAuthMiddleware);
+      }
+    });
+  } catch (err) {
+    console.log("Error @ socket channels init : ", err?.message);
+  }
 
   // validate auth on each socket connection
   io.use(socketAuthMiddleware);
@@ -69,41 +80,6 @@ const initializeSocket = (httpServer) => {
       } catch (err) {
         console.log(
           `Error @ chatUpdateBroadcast : ${JSON.stringify(
-            err
-          )}, error message : ${err?.message}`
-        );
-        return socket.emit("error", err?.message || "Something went wrong!");
-      }
-    };
-
-    // Handle validations at socket join & socket messaging
-    // 1. users should be valid users
-    // 2. users should have connection with each other to chat
-    const checkUsersIdentity = async (toUserId) => {
-      try {
-        const normalObjectIds = normalizeObjectIds([
-          socket?.userInfo?._id,
-          toUserId,
-        ]);
-        const usersCount = await UserModel.countDocuments({
-          _id: { $in: [...normalObjectIds] },
-        }).select("id");
-        if (usersCount !== 2) {
-          return socket.emit("error", "Invalid users!");
-        }
-        // check connected users
-        const connection = await ConReqModel.findOne({
-          $or: [
-            { fromUserId: normalObjectIds[0], toUserId: normalObjectIds[1] },
-            { fromUserId: normalObjectIds[1], toUserId: normalObjectIds[0] },
-          ],
-        }).select("_id");
-        if (!connection) {
-          return socket.emit("error", "Invalid users!");
-        }
-      } catch (err) {
-        console.log(
-          `Error @ checkUsersIdentity : ${JSON.stringify(
             err
           )}, error message : ${err?.message}`
         );
@@ -190,11 +166,39 @@ const socketAuthMiddleware = async (socket, next) => {
   }
 };
 
-// Normalize user ids to mongo objectIds
-const normalizeObjectIds = (ids) => {
-  return ids
-    ?.filter(isValidObjectId)
-    ?.map((id) => new mongoose.Types.ObjectId(id));
+// Handle validations at socket join & socket messaging
+// 1. users should be valid users
+// 2. users should have connection with each other to chat
+const checkUsersIdentity = async (toUserId) => {
+  try {
+    const normalObjectIds = normalizeObjectIds([
+      socket?.userInfo?._id,
+      toUserId,
+    ]);
+    const usersCount = await UserModel.countDocuments({
+      _id: { $in: [...normalObjectIds] },
+    }).select("id");
+    if (usersCount !== 2) {
+      return socket.emit("error", "Invalid users!");
+    }
+    // check connected users
+    const connection = await ConReqModel.findOne({
+      $or: [
+        { fromUserId: normalObjectIds[0], toUserId: normalObjectIds[1] },
+        { fromUserId: normalObjectIds[1], toUserId: normalObjectIds[0] },
+      ],
+    }).select("_id");
+    if (!connection) {
+      return socket.emit("error", "Invalid users!");
+    }
+  } catch (err) {
+    console.log(
+      `Error @ checkUsersIdentity : ${JSON.stringify(err)}, error message : ${
+        err?.message
+      }`
+    );
+    return socket.emit("error", err?.message || "Something went wrong!");
+  }
 };
 
 module.exports = initializeSocket;
