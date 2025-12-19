@@ -74,7 +74,9 @@ const requestsNameSpaceSetup = (io, authMiddleware) => {
 
     // 4. Listen disconneciton from clients
     requestNameSpace.on("disconnect", () => {
-      console.log(`Socket : ${socket.id}, disconnected`);
+      console.log(
+        `Socket : ${socket.id}, disconnected from request socket channel`
+      );
     });
   } catch (err) {
     console.log("Error at requestsNameSpaceSetup : ", err?.message);

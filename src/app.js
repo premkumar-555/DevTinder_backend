@@ -10,8 +10,7 @@ require("dotenv").config();
 const connectDB = require("./config/database");
 const port = process.env.PORT;
 const routers_array = require("./routes/routers");
-// Initiating cron jobs
-require("./cronJobs/main.cron");
+const initializeSocket = require("./utils/socket");
 
 // Enable CORS
 app.use(
@@ -20,10 +19,6 @@ app.use(
     credentials: true, // Enable cookies and credentials
   })
 );
-
-// Initialize Socket.io for real-time communication
-const initializeSocket = require("./utils/socket");
-initializeSocket(httpServer);
 
 // to transform json request to normal js object form
 app.use(express.json());
@@ -47,6 +42,10 @@ connectDB()
     console.log(`Connected to database successfully`);
     httpServer.listen(port, () => {
       console.log(`Server listening on port ${port}`);
+      // Initialize Socket.io for real-time communication
+      initializeSocket(httpServer);
+      // Initiating cron jobs
+      require("./cronJobs/main.cron");
     });
   })
   .catch((err) => {

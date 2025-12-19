@@ -91,7 +91,7 @@ const initializeSocket = (httpServer) => {
     socket.on("joinRoom", async (toUserId) => {
       try {
         // 1. Verify users identity
-        await checkUsersIdentity(toUserId);
+        await checkUsersIdentity(toUserId, socket);
         // 2. fetch roomId
         const roomId = await getChatID(toUserId, "joinRoom");
         // 3. Join socket to room
@@ -110,7 +110,7 @@ const initializeSocket = (httpServer) => {
     // Handle sending messages
     socket.on("sendMessage", async ({ toUserId, message }) => {
       // 1. Verify users identity
-      await checkUsersIdentity(toUserId);
+      await checkUsersIdentity(toUserId, socket);
       // 2. Get room Id
       const roomId = await getChatID(toUserId, "sendMessage", message);
       // 3. Broadcast message
@@ -120,11 +120,20 @@ const initializeSocket = (httpServer) => {
     // Handle user typing event
     socket.on("typing", async (toUserId) => {
       // 1. Verify users identity
-      await checkUsersIdentity(toUserId);
+      await checkUsersIdentity(toUserId, socket);
       // 2. Get room Id
       const roomId = await getChatID(toUserId, "sendMessage");
       // 3. Broadcast message except current typing user
       socket.to(roomId).emit("receiveTyping");
+    });
+
+    // Disconnect all socket connections on user logout
+    socket.on("logOut", () => {
+      // make all Socket instances that are currently connected on the given node disconnect
+      io.local.disconnectSockets();
+      console.log(
+        `socket : ${socket.id}, signed out, disconnected all sockets...`
+      );
     });
 
     socket.on("disconnect", () => {
@@ -139,13 +148,17 @@ const socketAuthMiddleware = async (socket, next) => {
     console.log("[..socketAuthMiddleware invoked..]");
     // verify token from socket.handshake.auth
     const token = socket?.handshake?.auth?.token;
+    console.log("socketAuthMiddleware, token exists ", !!token);
     if (!token) {
-      return next(new Error("Authentication error : No token provided!"));
+      return socket.emit("error", "Authentication error : No token provided!");
     }
     // validate token
     const decode = await JWT.verify(token, process.env.JWT_PRIVATE_KEY);
     if (!decode) {
-      return next(new Error("Authentication error : authentication denied!"));
+      return socket.emit(
+        "error",
+        "Authentication error : authentication denied!"
+      );
     }
     // verify user identity in db
     const user = await UserModel.findById(decode?.id)
@@ -169,7 +182,7 @@ const socketAuthMiddleware = async (socket, next) => {
 // Handle validations at socket join & socket messaging
 // 1. users should be valid users
 // 2. users should have connection with each other to chat
-const checkUsersIdentity = async (toUserId) => {
+const checkUsersIdentity = async (toUserId, socket) => {
   try {
     const normalObjectIds = normalizeObjectIds([
       socket?.userInfo?._id,
