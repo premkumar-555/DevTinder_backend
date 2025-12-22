@@ -5,6 +5,80 @@ const ChatModel = require("../models/chat");
 const ConReqModel = require("../models/connectionRequest");
 const { isValidObjectId, normalizeObjectIds } = require("./common");
 const { socketChannelsSetups } = require("./channels.socket");
+// In-memory cache to store online userIds along with their socketIds
+const onlineUsers = new Map();
+
+// Auth middleware for socket connections
+const socketAuthMiddleware = async (socket, next) => {
+  try {
+    console.log("[..socketAuthMiddleware invoked..]");
+    // verify token from socket.handshake.auth
+    const token = socket?.handshake?.auth?.token;
+    console.log("socketAuthMiddleware, token exists ", !!token);
+    if (!token) {
+      return socket.emit("error", "Authentication error : No token provided!");
+    }
+    // validate token
+    const decode = await JWT.verify(token, process.env.JWT_PRIVATE_KEY);
+    if (!decode) {
+      return socket.emit(
+        "error",
+        "Authentication error : authentication denied!"
+      );
+    }
+    // verify user identity in db
+    const user = await UserModel.findById(decode?.id)
+      .select(["firstName", "lastName", "profileUrl"])
+      .lean();
+    if (!user) {
+      return next(new Error("Authentication error : invalid user!"));
+    }
+    socket.userInfo = user;
+    next();
+  } catch (err) {
+    console.log(
+      `Socket auth error : ${JSON.stringify(err)}, error message : ${
+        err?.message
+      }`
+    );
+    return next(new Error("Authentication error : authentication denied!"));
+  }
+};
+
+// Handle validations at socket join & socket messaging
+// 1. users should be valid users
+// 2. users should have connection with each other to chat
+const checkUsersIdentity = async (toUserId, socket) => {
+  try {
+    const normalObjectIds = normalizeObjectIds([
+      socket?.userInfo?._id,
+      toUserId,
+    ]);
+    const usersCount = await UserModel.countDocuments({
+      _id: { $in: [...normalObjectIds] },
+    }).select("id");
+    if (usersCount !== 2) {
+      return socket.emit("error", "Invalid users!");
+    }
+    // check connected users
+    const connection = await ConReqModel.findOne({
+      $or: [
+        { fromUserId: normalObjectIds[0], toUserId: normalObjectIds[1] },
+        { fromUserId: normalObjectIds[1], toUserId: normalObjectIds[0] },
+      ],
+    }).select("_id");
+    if (!connection) {
+      return socket.emit("error", "Invalid users!");
+    }
+  } catch (err) {
+    console.log(
+      `Error @ checkUsersIdentity : ${JSON.stringify(err)}, error message : ${
+        err?.message
+      }`
+    );
+    return socket.emit("error", err?.message || "Something went wrong!");
+  }
+};
 
 const initializeSocket = (httpServer) => {
   const io = new Server(httpServer, {
@@ -87,6 +161,26 @@ const initializeSocket = (httpServer) => {
       }
     };
 
+    // on successful socket connection store userId in onlineUsers map
+    const curUserId = socket?.userInfo?._id?.toString() || "";
+    if (!onlineUsers.has(curUserId)) {
+      onlineUsers.set(curUserId, new Set([socket.id]));
+      // At first socket connection emit 'userOnline' event to all clients
+      socket.broadcast.emit("userOnline", { userId: socket.userInfo._id });
+    } else {
+      // If already a loged in user store respective socket id
+      onlineUsers.get(curUserId).add(socket.id);
+    }
+
+    // To get online users
+    socket.on("getOnlineUsers", (userIds) => {
+      const usersOnline = userIds?.filter((id) =>
+        onlineUsers.has(id.toString())
+      );
+      // emit 'onlineUsers' event to client
+      socket.emit("onlineUsers", usersOnline);
+    });
+
     // Handle joining a room for chat
     socket.on("joinRoom", async (toUserId) => {
       try {
@@ -127,91 +221,59 @@ const initializeSocket = (httpServer) => {
       socket.to(roomId).emit("receiveTyping");
     });
 
+    // listen joinChatRooms event
+    socket.on("joinChatRooms", async () => {
+      try {
+        // 1. fetch all chats for current socket user
+        const curUserId = socket?.userInfo?._id || "";
+        const chats = await ChatModel.find(
+          {
+            participants: curUserId,
+          },
+          { _id: 1 }
+        ).lean(true);
+        if (chats?.length > 0) {
+          chats.forEach(({ _id }) => socket.join(_id?.toString()));
+        }
+        console.log(
+          `socket : ${socket.id}, has joined all of his/her chat rooms...`,
+          chats
+        );
+      } catch (err) {
+        console.log(
+          `Error @ joinChatRooms : ${JSON.stringify(err)}, error message : ${
+            err?.message
+          }`
+        );
+        return socket.emit("error", err?.message || "Something went wrong!");
+      }
+    });
+
     // Disconnect all socket connections on user logout
     socket.on("logOut", () => {
+      // clear socket's userInfo
+      delete socket?.userInfo;
       // make all Socket instances that are currently connected on the given node disconnect
-      io.local.disconnectSockets();
-      console.log(
-        `socket : ${socket.id}, signed out, disconnected all sockets...`
-      );
+      socket.disconnect();
     });
 
     socket.on("disconnect", () => {
       console.log(`Socket : ${socket.id}, disconnected`);
+
+      // Handling user offline feature on socket disconnection
+      // 1. If user online clear socket id
+      const curUserId = socket?.userInfo?._id?.toString() || "";
+      if (onlineUsers.has(curUserId)) {
+        onlineUsers.get(curUserId).delete(socket.id);
+        // If all sockets disconnected clear userId from onlineUsers map
+        if (onlineUsers.get(curUserId)?.size === 0) {
+          onlineUsers.delete(curUserId);
+          // emit userOffline event to all clients
+          socket.broadcast.emit("userOffline", curUserId);
+        }
+      }
     });
   });
-};
-
-// Auth middleware for socket connections
-const socketAuthMiddleware = async (socket, next) => {
-  try {
-    console.log("[..socketAuthMiddleware invoked..]");
-    // verify token from socket.handshake.auth
-    const token = socket?.handshake?.auth?.token;
-    console.log("socketAuthMiddleware, token exists ", !!token);
-    if (!token) {
-      return socket.emit("error", "Authentication error : No token provided!");
-    }
-    // validate token
-    const decode = await JWT.verify(token, process.env.JWT_PRIVATE_KEY);
-    if (!decode) {
-      return socket.emit(
-        "error",
-        "Authentication error : authentication denied!"
-      );
-    }
-    // verify user identity in db
-    const user = await UserModel.findById(decode?.id)
-      .select(["firstName", "lastName", "profileUrl"])
-      .lean();
-    if (!user) {
-      return next(new Error("Authentication error : invalid user!"));
-    }
-    socket.userInfo = user;
-    next();
-  } catch (err) {
-    console.log(
-      `Socket auth error : ${JSON.stringify(err)}, error message : ${
-        err?.message
-      }`
-    );
-    return next(new Error("Authentication error : authentication denied!"));
-  }
-};
-
-// Handle validations at socket join & socket messaging
-// 1. users should be valid users
-// 2. users should have connection with each other to chat
-const checkUsersIdentity = async (toUserId, socket) => {
-  try {
-    const normalObjectIds = normalizeObjectIds([
-      socket?.userInfo?._id,
-      toUserId,
-    ]);
-    const usersCount = await UserModel.countDocuments({
-      _id: { $in: [...normalObjectIds] },
-    }).select("id");
-    if (usersCount !== 2) {
-      return socket.emit("error", "Invalid users!");
-    }
-    // check connected users
-    const connection = await ConReqModel.findOne({
-      $or: [
-        { fromUserId: normalObjectIds[0], toUserId: normalObjectIds[1] },
-        { fromUserId: normalObjectIds[1], toUserId: normalObjectIds[0] },
-      ],
-    }).select("_id");
-    if (!connection) {
-      return socket.emit("error", "Invalid users!");
-    }
-  } catch (err) {
-    console.log(
-      `Error @ checkUsersIdentity : ${JSON.stringify(err)}, error message : ${
-        err?.message
-      }`
-    );
-    return socket.emit("error", err?.message || "Something went wrong!");
-  }
 };
 
 module.exports = initializeSocket;
