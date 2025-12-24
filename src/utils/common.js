@@ -10,9 +10,25 @@ const normalizeObjectIds = (ids) => {
 };
 
 const INTERESTED = "interested";
+const ACCEPTED = "accepted";
+const PENDING = "pending";
+const DELIVERED = "delivered";
+const NEW_MESSAGE = "newMessage";
+const NEW_REQUEST = "newRequest";
+const REQUEST_ACCEPTED = "requestAccepted";
+
+// In-memory cache to store online userIds along with their socketIds
+const onlineUsers = new Map();
 
 module.exports = {
   isValidObjectId,
   INTERESTED,
+  PENDING,
+  DELIVERED,
+  NEW_MESSAGE,
+  NEW_REQUEST,
+  REQUEST_ACCEPTED,
   normalizeObjectIds,
+  onlineUsers,
+  ACCEPTED,
 };

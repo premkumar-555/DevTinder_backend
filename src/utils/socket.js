@@ -3,10 +3,18 @@ const JWT = require("jsonwebtoken");
 const UserModel = require("../models/user");
 const ChatModel = require("../models/chat");
 const ConReqModel = require("../models/connectionRequest");
-const { isValidObjectId, normalizeObjectIds } = require("./common");
-const { socketChannelsSetups } = require("./channels.socket");
-// In-memory cache to store online userIds along with their socketIds
-const onlineUsers = new Map();
+const {
+  isValidObjectId,
+  normalizeObjectIds,
+  PENDING,
+  NEW_MESSAGE,
+  NEW_REQUEST,
+  REQUEST_ACCEPTED,
+} = require("./common");
+const { sendNotification } = require("./notify");
+const { onlineUsers } = require("./common");
+// global socketIO variablue to reuse
+let io = null;
 
 // Auth middleware for socket connections
 const socketAuthMiddleware = async (socket, next) => {
@@ -29,7 +37,7 @@ const socketAuthMiddleware = async (socket, next) => {
     // verify user identity in db
     const user = await UserModel.findById(decode?.id)
       .select(["firstName", "lastName", "profileUrl"])
-      .lean();
+      .lean(true);
     if (!user) {
       return next(new Error("Authentication error : invalid user!"));
     }
@@ -81,22 +89,11 @@ const checkUsersIdentity = async (toUserId, socket) => {
 };
 
 const initializeSocket = (httpServer) => {
-  const io = new Server(httpServer, {
+  io = new Server(httpServer, {
     cors: {
       origin: "http://localhost:5173",
     },
   });
-
-  // Setup Socket Channels (sub-sockets)
-  try {
-    socketChannelsSetups.forEach((channelSetter) => {
-      if (!!channelSetter && !!io) {
-        channelSetter(io, socketAuthMiddleware);
-      }
-    });
-  } catch (err) {
-    console.log("Error @ socket channels init : ", err?.message);
-  }
 
   // validate auth on each socket connection
   io.use(socketAuthMiddleware);
@@ -104,6 +101,10 @@ const initializeSocket = (httpServer) => {
   // Listen and handle socket connections
   io.on("connection", (socket) => {
     console.log(`Socket ${socket.id} connected to server`);
+    // On socket connection, join socket to its user id room
+    const socketUserId = socket?.userInfo?._id?.toString() || "";
+
+    socket.join(`user:${socketUserId}`);
 
     // function to broadcast messages to chat room
     const broadCastMessage = (roomId, data) => {
@@ -127,10 +128,7 @@ const initializeSocket = (httpServer) => {
     const getChatID = async (toUserId, eventName = "", message = "") => {
       try {
         // 1. Find chat exists or not
-        const normalObjectIds = normalizeObjectIds([
-          socket?.userInfo?._id,
-          toUserId,
-        ]);
+        const normalObjectIds = normalizeObjectIds([socketUserId, toUserId]);
         let chat = await ChatModel.findOne({
           participants: { $all: [...normalObjectIds] },
         });
@@ -144,7 +142,7 @@ const initializeSocket = (httpServer) => {
         // b) update chat on new messages
         if (chat && eventName === "sendMessage" && !!message) {
           chat.messages.push({
-            fromUser: socket?.userInfo?._id,
+            fromUser: socketUserId,
             message,
           });
         }
@@ -162,14 +160,13 @@ const initializeSocket = (httpServer) => {
     };
 
     // on successful socket connection store userId in onlineUsers map
-    const curUserId = socket?.userInfo?._id?.toString() || "";
-    if (!onlineUsers.has(curUserId)) {
-      onlineUsers.set(curUserId, new Set([socket.id]));
+    if (!onlineUsers.has(socketUserId)) {
+      onlineUsers.set(socketUserId, new Set([socket.id]));
       // At first socket connection emit 'userOnline' event to all clients
-      socket.broadcast.emit("userOnline", { userId: socket.userInfo._id });
+      socket.broadcast.emit("userOnline", { userId: socketUserId });
     } else {
       // If already a loged in user store respective socket id
-      onlineUsers.get(curUserId).add(socket.id);
+      onlineUsers.get(socketUserId).add(socket.id);
     }
 
     // To get online users
@@ -189,8 +186,12 @@ const initializeSocket = (httpServer) => {
         // 2. fetch roomId
         const roomId = await getChatID(toUserId, "joinRoom");
         // 3. Join socket to room
-        socket.join(roomId);
-        console.log(`Socket : ${socket.id}, joined room`);
+        if (socket.rooms.has(roomId)) {
+          console.log(`Socket ${socket.id} is already in room ${roomId}`);
+        } else {
+          socket.join(roomId);
+          console.log(`Socket : ${socket.id}, joined room`);
+        }
       } catch (err) {
         console.log(
           `Error @ joinRoom, socket : ${socket.id}, err : ${JSON.stringify(
@@ -209,6 +210,15 @@ const initializeSocket = (httpServer) => {
       const roomId = await getChatID(toUserId, "sendMessage", message);
       // 3. Broadcast message
       broadCastMessage(roomId, { toUserId, message });
+      const { firstName, lastName } = socket?.userInfo;
+      // 4. On new message, send notification
+      const payload = {
+        fromUser: socket?.userInfo,
+        toUserId,
+        type: NEW_MESSAGE,
+        message,
+      };
+      sendNotification(io, payload);
     });
 
     // Handle user typing event
@@ -219,34 +229,6 @@ const initializeSocket = (httpServer) => {
       const roomId = await getChatID(toUserId, "sendMessage");
       // 3. Broadcast message except current typing user
       socket.to(roomId).emit("receiveTyping");
-    });
-
-    // listen joinChatRooms event
-    socket.on("joinChatRooms", async () => {
-      try {
-        // 1. fetch all chats for current socket user
-        const curUserId = socket?.userInfo?._id || "";
-        const chats = await ChatModel.find(
-          {
-            participants: curUserId,
-          },
-          { _id: 1 }
-        ).lean(true);
-        if (chats?.length > 0) {
-          chats.forEach(({ _id }) => socket.join(_id?.toString()));
-        }
-        console.log(
-          `socket : ${socket.id}, has joined all of his/her chat rooms...`,
-          chats
-        );
-      } catch (err) {
-        console.log(
-          `Error @ joinChatRooms : ${JSON.stringify(err)}, error message : ${
-            err?.message
-          }`
-        );
-        return socket.emit("error", err?.message || "Something went wrong!");
-      }
     });
 
     // Disconnect all socket connections on user logout
@@ -262,18 +244,23 @@ const initializeSocket = (httpServer) => {
 
       // Handling user offline feature on socket disconnection
       // 1. If user online clear socket id
-      const curUserId = socket?.userInfo?._id?.toString() || "";
-      if (onlineUsers.has(curUserId)) {
-        onlineUsers.get(curUserId).delete(socket.id);
+      if (onlineUsers.has(socketUserId)) {
+        onlineUsers.get(socketUserId).delete(socket.id);
         // If all sockets disconnected clear userId from onlineUsers map
-        if (onlineUsers.get(curUserId)?.size === 0) {
-          onlineUsers.delete(curUserId);
+        if (onlineUsers.get(socketUserId)?.size === 0) {
+          onlineUsers.delete(socketUserId);
           // emit userOffline event to all clients
-          socket.broadcast.emit("userOffline", curUserId);
+          socket.broadcast.emit("userOffline", { userId: socketUserId });
         }
       }
     });
   });
 };
 
-module.exports = initializeSocket;
+// get io
+const getIO = () => (!!io ? io : {});
+
+module.exports = {
+  initializeSocket,
+  getIO,
+};

@@ -9,6 +9,14 @@ const {
 const getMailTemplate = require("../emailTemplates/sentRequest");
 const sendSESMail = require("../utils/sendEmail.js");
 const INTERESTED = "interested";
+// const { sendNotification } = require("../utils/socket.js");
+const {
+  NEW_REQUEST,
+  REQUEST_ACCEPTED,
+  ACCEPTED,
+} = require("../utils/common.js");
+const { sendNotification } = require("../utils/notify.js");
+const { getIO } = require("../utils/socket.js");
 
 // POST - /request/send/:status/:toUserId - status : [interested, ignore]
 requestRouter.post(
@@ -56,7 +64,20 @@ requestRouter.post(
       await conReq.save();
       console.log("Connection request created successfully");
       if (status === INTERESTED) {
-        await conReq.populate({ path: "toUserId", select: "firstName _id" });
+        await conReq.populate([
+          { path: "toUserId", select: "firstName _id" },
+          {
+            path: "fromUserId",
+            select: ["_id", "firstName", "lastName"],
+          },
+        ]);
+        // emit new request notification to client
+        const payload = {
+          fromUser: conReq?.fromUserId || {},
+          toUserId,
+          type: NEW_REQUEST,
+        };
+        sendNotification(getIO(), payload);
         // SEND SES MAIL TO ADMIN
         const mailBody = await getMailTemplate(
           process.env.EMAIL_RECEIVER_USER_NAME,
@@ -110,7 +131,7 @@ requestRouter.post(
       const conReq = await ConnectionRequest.findOne({
         _id: requestId,
         toUserId: loggedInUser._id,
-        status: "interested",
+        status: INTERESTED,
       });
       // if connection request not exists deny update
       if (!conReq) {
@@ -123,12 +144,24 @@ requestRouter.post(
       conReq.status = status;
       await conReq.save();
       console.log(`Connection request ${status} successfully`);
+      if (status === ACCEPTED) {
+        // emit new request notification to client
+        const payload = {
+          fromUser: loggedInUser || {},
+          toUserId: conReq?.fromUserId?.toString(),
+          type: REQUEST_ACCEPTED,
+        };
+        sendNotification(getIO(), payload);
+      }
       return res.status(200).send({
         data: conReq,
         message: `Connection request ${status} successfully!`,
       });
     } catch (err) {
-      console.log(`Err @  /review/:status/:requestId : ${JSON.stringify(err)}`);
+      console.log(
+        `Err @  /review/:status/:requestId : ${JSON.stringify(err)}`,
+        err?.message
+      );
       return res
         .status(500)
         .send(`ERROR : ${err?.message || "Something went wrong!"}`);

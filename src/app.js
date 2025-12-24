@@ -10,7 +10,7 @@ require("dotenv").config();
 const connectDB = require("./config/database");
 const port = process.env.PORT;
 const routers_array = require("./routes/routers");
-const initializeSocket = require("./utils/socket");
+const { initializeSocket } = require("./utils/socket");
 
 // Enable CORS
 app.use(
@@ -25,6 +25,9 @@ app.use(express.json());
 
 // parse cookies head and populate req.cookies
 app.use(cookieParser());
+
+// Initialize Socket.io for real-time communication
+initializeSocket(httpServer);
 
 // registering routes with respective controllers, on application
 if (routers_array?.length > 0) {
@@ -42,8 +45,6 @@ connectDB()
     console.log(`Connected to database successfully`);
     httpServer.listen(port, () => {
       console.log(`Server listening on port ${port}`);
-      // Initialize Socket.io for real-time communication
-      initializeSocket(httpServer);
       // Initiating cron jobs
       require("./cronJobs/main.cron");
     });
