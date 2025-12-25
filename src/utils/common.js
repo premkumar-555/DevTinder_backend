@@ -16,6 +16,7 @@ const DELIVERED = "delivered";
 const NEW_MESSAGE = "newMessage";
 const NEW_REQUEST = "newRequest";
 const REQUEST_ACCEPTED = "requestAccepted";
+const NEW_NOTIFICATION = "newNotification";
 
 // In-memory cache to store online userIds along with their socketIds
 const onlineUsers = new Map();
@@ -31,4 +32,5 @@ module.exports = {
   normalizeObjectIds,
   onlineUsers,
   ACCEPTED,
+  NEW_NOTIFICATION,
 };

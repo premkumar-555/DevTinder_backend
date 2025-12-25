@@ -9,9 +9,19 @@ const sendSESMail = require("../utils/sendEmail.js");
 const timezone = "Asia/Kolkata";
 const EMAIL_QUEUE = "emailQueue";
 const connection = new IORedis({
-  maxRetriesPerRequest: null,
+  maxRetriesPerRequest: 3,
 });
 const { workersRegistry } = require("./utility.js");
+
+// IORedis connection error handling
+connection.on("error", (err) => {
+  console.error(
+    "[ioredis] An error occurred:",
+    JSON.stringify(err),
+    " error message : ",
+    err?.message || "NA"
+  );
+});
 
 // cron job to execute at 8AM daily to send mail notifications to
 // users who received connection requests previous day

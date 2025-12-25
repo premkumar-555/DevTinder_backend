@@ -3,15 +3,8 @@ const JWT = require("jsonwebtoken");
 const UserModel = require("../models/user");
 const ChatModel = require("../models/chat");
 const ConReqModel = require("../models/connectionRequest");
-const {
-  isValidObjectId,
-  normalizeObjectIds,
-  PENDING,
-  NEW_MESSAGE,
-  NEW_REQUEST,
-  REQUEST_ACCEPTED,
-} = require("./common");
-const { sendNotification } = require("./notify");
+const { normalizeObjectIds, NEW_MESSAGE } = require("./common");
+const { sendNotification, processPendingNofifications } = require("./notify");
 const { onlineUsers } = require("./common");
 // global socketIO variablue to reuse
 let io = null;
@@ -159,7 +152,7 @@ const initializeSocket = (httpServer) => {
       }
     };
 
-    // on successful socket connection store userId in onlineUsers map
+    // IMP** : on successful socket connection store userId in onlineUsers map
     if (!onlineUsers.has(socketUserId)) {
       onlineUsers.set(socketUserId, new Set([socket.id]));
       // At first socket connection emit 'userOnline' event to all clients
@@ -168,6 +161,22 @@ const initializeSocket = (httpServer) => {
       // If already a loged in user store respective socket id
       onlineUsers.get(socketUserId).add(socket.id);
     }
+
+    // on successful user socket client connection,
+    // process pending notifications if any
+    processPendingNofifications(io, socketUserId)
+      .then((res) => {
+        console.log(
+          `socket : ${socket.id}, process pending notifications response : ${res}`
+        );
+      })
+      .catch((err) => {
+        console.log(
+          `Err @ processPendingNofifications : ${JSON.stringify(
+            err
+          )}, error message : ${err?.message}`
+        );
+      });
 
     // To get online users
     socket.on("getOnlineUsers", (userIds) => {
@@ -210,7 +219,6 @@ const initializeSocket = (httpServer) => {
       const roomId = await getChatID(toUserId, "sendMessage", message);
       // 3. Broadcast message
       broadCastMessage(roomId, { toUserId, message });
-      const { firstName, lastName } = socket?.userInfo;
       // 4. On new message, send notification
       const payload = {
         fromUser: socket?.userInfo,

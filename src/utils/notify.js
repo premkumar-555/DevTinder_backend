@@ -4,7 +4,10 @@ const {
   NEW_REQUEST,
   onlineUsers,
   REQUEST_ACCEPTED,
+  NEW_NOTIFICATION,
+  DELIVERED,
 } = require("./common");
+const NotificationModel = require("../models/notifications");
 
 // To get notification message info based on type
 const getMessageInfo = (type, message = "", fromUserName) => {
@@ -29,7 +32,6 @@ const sendNotification = async (socketIO, payload) => {
     return;
   }
   try {
-    const notificationModel = require("../models/notifications");
     const {
       fromUser: { _id, firstName, lastName },
       toUserId,
@@ -41,13 +43,13 @@ const sendNotification = async (socketIO, payload) => {
     // else store in db
     const info = getMessageInfo(type, message, fromUserName);
     if (onlineUsers.has(toUserId)) {
-      socketIO.to(`user:${toUserId}`).emit("newNotification", {
+      socketIO.to(`user:${toUserId}`).emit(NEW_NOTIFICATION, {
         type,
         fromUser: { _id, firstName, lastName },
         info,
       });
     } else {
-      const newNotification = new notificationModel({
+      const newNotification = new NotificationModel({
         fromUserId: _id,
         toUserId,
         type,
@@ -57,6 +59,7 @@ const sendNotification = async (socketIO, payload) => {
       await newNotification.save();
       console.log(`Successfully saved new notification message item.`);
     }
+    return true;
   } catch (err) {
     console.log(
       `Error @ sendNotification : ${JSON.stringify(err)}`,
@@ -69,6 +72,75 @@ const sendNotification = async (socketIO, payload) => {
   }
 };
 
+// To process and send pending notifications to user when he is online
+const processPendingNofifications = async (socketIO, toUserId) => {
+  try {
+    // 1. fetch pending notifications from db to toUserId
+    const pendingNotifications = await NotificationModel.find({
+      toUserId,
+      status: PENDING,
+    })
+      .populate({
+        path: "fromUserId",
+        select: ["_id", "firstName", "lastName"],
+      })
+      .select(["_id", "fromUserId", "type", "info"])
+      .lean();
+    if (pendingNotifications?.length > 0) {
+      for await (const {
+        fromUserId: fromUser,
+        info: message,
+        ...remains
+      } of pendingNotifications) {
+        const payload = {
+          ...remains,
+          fromUser: { _id: fromUser?._id?.toString(), ...fromUser },
+          toUserId,
+          message,
+        };
+        const notifiedResponse = await processNotifyItem(socketIO, payload);
+        console.log(
+          `Deliver notification : ${payload?._id?.toString()}, to user : ${toUserId} is ${
+            notifiedResponse ? "success" : "failed"
+          }`
+        );
+      }
+    }
+    return true;
+  } catch (err) {
+    console.log(
+      `Error @ sendPendingNofifications: ${JSON.stringify(err)}, ${
+        err?.message
+      }`
+    );
+  }
+};
+
+// To process pending notification message items
+const processNotifyItem = (socketIO, payload) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // send notification
+      const notifyResponse = await sendNotification(socketIO, payload);
+      // update notification status as 'delivered'
+      if (notifyResponse) {
+        const updateRes = await NotificationModel.findByIdAndUpdate(
+          payload?._id,
+          { status: DELIVERED },
+          {
+            runValidators: true,
+            returnDocument: "after",
+          }
+        );
+      }
+      resolve(true);
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
 module.exports = {
   sendNotification,
+  processPendingNofifications,
 };
