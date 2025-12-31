@@ -39,6 +39,6 @@ I have deployed the frontend and backend apps on AWS EC2 instance using NgInx fo
 As part of a small break and upskilling myself to make a career transition from an intermediate full stack developer to a Backend developer have worked on this project.
 Still a lot more technologies and tools are in my bucket which will be learnt in coming days.
 
-Thank you so much for going through my project. <img src="https://media.tenor.com/i1lvpt7wD6AAAAAm/diwali-sparkles-mubarak.webp" width="30px"  height="30px">
+Thank you so much for going through my project. <img src="https://media.tenor.com/i1lvpt7wD6AAAAAm/diwali-sparkles-mubarak.webp" width="35px"  height="35px">
 
 
